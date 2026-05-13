@@ -16,10 +16,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # for Arm based macs (M1 and above).
-            args: '--target aarch64-apple-darwin'
-          - platform: 'ubuntu-22.04' # for Tauri v1 you could replace this with ubuntu-20.04.
-            args: ''
+          # - platform: 'macos-latest' # for Arm based macs (M1 and above).
+          #   args: '--target aarch64-apple-darwin'
+          # - platform: 'ubuntu-22.04' # for Tauri v1 you could replace this with ubuntu-20.04.
+          #   args: ''
           - platform: 'windows-latest'
             args: ''
 
@@ -27,6 +27,29 @@ jobs:
     environment: release
     steps:
       - uses: actions/checkout@v4
+
+      - name: print variables
+        shell: bash
+        run: |
+          echo "--- Environment Secret Check ---"
+          
+          echo "SECRET_VALUE (via alias):"
+          if [ -z "$SECRET_VALUE" ]; then echo "  Status: EMPTY"; else echo "  Status: LOADED (${#SECRET_VALUE} chars)"; fi
+          
+          echo "TAURI_SIGNING_PRIVATE_KEY:"
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then echo "  Status: EMPTY"; else echo "  Status: LOADED (${#TAURI_SIGNING_PRIVATE_KEY} chars)"; fi
+          
+          echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD:"
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then echo "  Status: EMPTY"; else echo "  Status: LOADED (${#TAURI_SIGNING_PRIVATE_KEY_PASSWORD} chars)"; fi
+          
+          echo "--------------------------------"
+          echo "Raw Masked Output (should show ***):"
+          echo "Key: $TAURI_SIGNING_PRIVATE_KEY"
+          echo "Pass: $TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+        env:
+          SECRET_VALUE: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: setup node
         uses: actions/setup-node@v4
