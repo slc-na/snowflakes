@@ -18,6 +18,9 @@
     "opener:default",
     "stronghold:default",
     "stronghold:allow-remove-store-record",
-    "dialog:default"
+    "dialog:default",
+    "oauth:allow-start",
+    "oauth:allow-cancel",
+    "shell:allow-open"
   ]
 }

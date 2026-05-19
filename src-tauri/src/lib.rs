@@ -8,13 +8,14 @@ use ssh::manage_session::disconnect;
 use ssh::manage_session::get_active_session;
 use ssh::reconnect::reconnect_to_session;
 use ssh::start::start_ssh_session;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 use sysinfo::System;
+use std::collections::HashMap;
 
 mod sftp;
 mod ssh;
+mod oauth;
 
 #[derive(Serialize)]
 struct SystemStats {
@@ -57,7 +58,7 @@ fn greet(name: &str) -> String {
 //     } else {
 //         Err("No active SSH session".into())
 //     }
-// }
+// }    
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -99,7 +100,9 @@ pub fn run() {
         .manage(ssh_state)
         .manage(SftpEngine(Arc::new(Mutex::new(HashMap::new()))))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_oauth::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             get_system_stats,
@@ -114,6 +117,11 @@ pub fn run() {
             sftp::list::sftp_list_dir,
             sftp::download::sftp_download_file,
             sftp::upload::sftp_upload_file,
+            oauth::server::start_server,
+            oauth::token::get_token,
+            oauth::token::delete_token,
+            oauth::auth::open_oauth_login,
+            oauth::auth::oauth_is_authenticated
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

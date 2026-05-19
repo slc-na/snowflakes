@@ -11,7 +11,6 @@ use std::{
 use tauri::Emitter;
 use tauri::Window;
 use tokio::sync::mpsc::UnboundedReceiver;
-use tokio::sync::oneshot;
 use tokio::sync::watch;
 
 pub struct SshEngine(pub Arc<Mutex<HashMap<String, SshInstance>>>);

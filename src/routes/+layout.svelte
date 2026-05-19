@@ -23,11 +23,13 @@
 		{ icon: Settings, text: "SETTINGS", href: "/settings" },
 	];
 
-	let showTabBar = menus.some(
+	let showTabBar = $derived(menus.some(
 		(menu) =>
 			menu.href === $page.url.pathname ||
 			$page.url.pathname.includes("/session"),
-	);
+	));
+	
+	let isLoginPage = $derived($page.url.pathname === '/login');
 </script>
 
 <TitleBar />
@@ -44,32 +46,32 @@
 	}}
 />
 
-<div class="app-parent">
-	<aside class="sidebar-container">
-		<div class="brand-section">
-			<h1 class="brand-title">SNOWFLAKES</h1>
-			<p class="brand-subtitle">SSH MANAGER</p>
+	<div class="app-parent">
+		<aside class="sidebar-container">
+			<div class="brand-section">
+				<h1 class="brand-title">SNOWFLAKES</h1>
+				<p class="brand-subtitle">SSH MANAGER</p>
+			</div>
+
+			<nav class="nav-menu">
+				{#each menus as menu}
+					<SidebarElement
+						text={menu.text}
+						icon={menu.icon}
+						href={menu.href}
+						isActive={$page.url.pathname === menu.href}
+					/>
+				{/each}
+			</nav>
+		</aside>
+
+		<div class="app-layout">
+			{#if showTabBar}
+				<SessionTabBar />
+			{/if}
+			<slot />
 		</div>
-
-		<nav class="nav-menu">
-			{#each menus as menu}
-				<SidebarElement
-					text={menu.text}
-					icon={menu.icon}
-					href={menu.href}
-					isActive={$page.url.pathname === menu.href}
-				/>
-			{/each}
-		</nav>
-	</aside>
-
-	<div class="app-layout">
-		{#if showTabBar}
-			<SessionTabBar />
-		{/if}
-		<slot />
 	</div>
-</div>
 
 <style>
 	.app-parent {
