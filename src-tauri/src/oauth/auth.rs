@@ -80,8 +80,17 @@ pub async fn oauth_is_authenticated() -> bool {
     match result {
         Ok(token) => {
             println!("Access token found: {}", token);
-
-            return true;
+            let user_info_result = get_user_detail(&token).await;
+            match user_info_result {
+                Ok(user_info) => {
+                    println!("User info retrieved successfully: {}", user_info);
+                    return true;
+                }
+                Err(e) => {
+                    eprintln!("Failed to retrieve user info: {}", e);
+                    return false;
+                }
+            }
         }
         Err(e) => {
             println!("No access token found: {}", e);
@@ -89,6 +98,28 @@ pub async fn oauth_is_authenticated() -> bool {
     }
 
     false
+}
+
+pub async fn get_user_detail(access_token: &str) -> Result<serde_json::Value, String> {
+    let (_, _, _, _, _, _secret_key, base_uri) = load_env_config();
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&format!("{}api/user", base_uri))
+        .bearer_auth(access_token)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if response.status().is_success() {
+        let user_info = response.json::<serde_json::Value>().await.map_err(|e| e.to_string())?;
+        Ok(user_info)
+    } else {
+        Err(format!(
+            "Failed to fetch user details: HTTP {}",
+            response.status()
+        ))
+    }
 }
 
 pub async fn handle_oauth_callback(window: Window, raw_url: String) {
@@ -121,6 +152,21 @@ pub async fn handle_oauth_callback(window: Window, raw_url: String) {
                                 {
                                     eprintln!("Failed to save access token: {}", e);
                                 } else {
+                                    let user_info_result = get_user_detail(access_token).await;
+                                    match user_info_result {
+                                        Ok(user_info) => {
+                                            println!("User info retrieved successfully: {}", user_info);
+                                            window.emit("oauth-success", user_info).unwrap_or_else(|e| {
+                                                eprintln!("Failed to emit oauth-success event: {}", e);
+                                            });
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to retrieve user info: {}", e);
+                                            window.emit("oauth-error", format!("Failed to retrieve user info: {}", e)).unwrap_or_else(|e| {
+                                                eprintln!("Failed to emit oauth-error event: {}", e);
+                                            });
+                                        }
+                                    }
                                     println!("Access token saved successfully.");
                                 }
                             } else {
