@@ -1,9 +1,8 @@
-use tauri_plugin_oauth::OauthConfig;
-use tauri_plugin_oauth::start_with_config;
-use url::Url;
-use tauri::{Emitter, Window};
-use super::token::save_access_token;
+use super::auth::handle_oauth_callback;
 use dotenvy_macro::dotenv;
+use tauri::Window;
+use tauri_plugin_oauth::start_with_config;
+use tauri_plugin_oauth::OauthConfig;
 
 #[tauri::command]
 pub async fn start_server(window: Window) {
@@ -14,29 +13,11 @@ pub async fn start_server(window: Window) {
     };
 
     let result = start_with_config(config, move |raw_url| {
-        if let Ok(parsed_url) = Url::parse(&raw_url) {
-            
-            let auth_code = parsed_url.query_pairs()
-                .find(|(key, _)| key == "code")
-                .map(|(_, value)| value.into_owned());
+        let window_for_async = window.clone();
 
-            match auth_code {
-                Some(code) => {
-                    println!("Successfully extracted Auth Code: {}", code);
-
-                    save_access_token(&code).unwrap_or_else(|e| eprintln!("Failed to save token: {}", e));
-                    
-                    let _ = window.emit("oauth_success", code);
-                }
-                None => {
-                    eprintln!("No auth code found in the URL.");
-                    let _ = window.emit("oauth_error", "No code in URL");
-                }
-            }
-        } else {
-            eprintln!("Failed to parse the incoming URL.");
-            let _ = window.emit("oauth_error", "Invalid URL format");
-        }
+        tauri::async_runtime::spawn(async move {
+            handle_oauth_callback(window_for_async, raw_url).await;
+        });
     });
 
     match result {

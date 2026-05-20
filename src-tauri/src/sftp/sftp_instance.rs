@@ -15,8 +15,7 @@ impl SftpInstance {
         let tcp = std::net::TcpStream::connect(format!("{}:22", hostname))
             .map_err(|e| format!("Gagal koneksi ke host: {}", e))?;
 
-        let mut sess = ssh2::Session::new()
-            .map_err(|e| e.to_string())?;
+        let mut sess = ssh2::Session::new().map_err(|e| e.to_string())?;
 
         sess.set_tcp_stream(tcp);
 
@@ -30,7 +29,8 @@ impl SftpInstance {
             return Err("Autentikasi gagal".into());
         }
 
-        let sftp = sess.sftp()
+        let sftp = sess
+            .sftp()
             .map_err(|e| format!("Gagal membuka SFTP: {}", e))?;
 
         Ok(sftp)

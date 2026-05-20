@@ -2,20 +2,21 @@
 
 use crate::sftp::sftp_engine::SftpEngine;
 use crate::ssh::ssh_engine::SshEngine;
+use reqwest::Client;
 use serde::Serialize;
 use ssh::input::send_ssh_input;
 use ssh::manage_session::disconnect;
 use ssh::manage_session::get_active_session;
 use ssh::reconnect::reconnect_to_session;
 use ssh::start::start_ssh_session;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 use sysinfo::System;
-use std::collections::HashMap;
 
+mod oauth;
 mod sftp;
 mod ssh;
-mod oauth;
 
 #[derive(Serialize)]
 struct SystemStats {
@@ -58,7 +59,7 @@ fn greet(name: &str) -> String {
 //     } else {
 //         Err("No active SSH session".into())
 //     }
-// }    
+// }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -66,6 +67,7 @@ pub fn run() {
     let ssh_state = SshEngine(Arc::new(Mutex::new(HashMap::new())));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_stronghold::Builder::new(|password| {
@@ -98,6 +100,7 @@ pub fn run() {
         })
         .manage(metric_state)
         .manage(ssh_state)
+        .manage(Client::new())
         .manage(SftpEngine(Arc::new(Mutex::new(HashMap::new()))))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())

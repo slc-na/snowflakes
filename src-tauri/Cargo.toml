@@ -37,6 +37,8 @@ dotenvy = "0.15"
 tauri-plugin-keyring = "0.1.0"
 keyring = { version = "3.0", features = ["apple-native", "windows-native", "linux-native"] }
 dotenvy_macro = "0.15.7"
+reqwest = { version = "0.12", features = ["json"] }
+tauri-plugin-store = "2"
 
 [profile.dev.package.scrypt]
 opt-level = 3
