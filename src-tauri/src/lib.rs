@@ -17,6 +17,7 @@ use sysinfo::System;
 mod oauth;
 mod sftp;
 mod ssh;
+mod store;
 
 #[derive(Serialize)]
 struct SystemStats {
@@ -124,7 +125,8 @@ pub fn run() {
             oauth::token::get_token,
             oauth::token::delete_token,
             oauth::auth::open_oauth_login,
-            oauth::auth::oauth_is_authenticated
+            oauth::auth::oauth_is_authenticated,
+            store::user::get_user_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

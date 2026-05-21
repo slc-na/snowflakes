@@ -2,6 +2,7 @@ use super::token::get_token;
 use super::token::save_access_token;
 use super::token::save_refresh_token;
 use crate::HashMap;
+use crate::store::user::save_user_info;
 use dotenvy_macro::dotenv;
 use reqwest::Client;
 use tauri::Manager;
@@ -48,13 +49,21 @@ pub async fn send_request_access(client: State<'_, Client>, code: &str) -> Resul
         .post(&format!("{}oauth/token", base_uri))
         .form(&params)
         .send()
-        .await
-        .map_err(|e| e.to_string())?;
+        .await;
+    
+    match response {
+        Ok(resp) => {
+            let text = resp.text().await.map_err(|e| e.to_string())?;
+            Ok(text)
+        },
+        Err(e) => {
+            eprintln!("Failed to send token request: {}", e);
+            return Err(format!("Failed to send token request: {}", e));
+        }
+    }
 
-    println!("Response: {}", response.status().as_str());
 
-    let text = response.text().await.map_err(|e| e.to_string())?;
-    Ok(text)
+   
 }
 
 #[tauri::command]
@@ -82,8 +91,7 @@ pub async fn oauth_is_authenticated() -> bool {
             println!("Access token found: {}", token);
             let user_info_result = get_user_detail(&token).await;
             match user_info_result {
-                Ok(user_info) => {
-                    println!("User info retrieved successfully: {}", user_info);
+                Ok(_) => {
                     return true;
                 }
                 Err(e) => {
@@ -123,6 +131,9 @@ pub async fn get_user_detail(access_token: &str) -> Result<serde_json::Value, St
 }
 
 pub async fn handle_oauth_callback(window: Window, raw_url: String) {
+
+    let app = window.app_handle().clone();
+
     if let Ok(parsed_url) = Url::parse(&raw_url) {
         let client = window.state::<Client>();
         let auth_code = parsed_url
@@ -156,8 +167,11 @@ pub async fn handle_oauth_callback(window: Window, raw_url: String) {
                                     match user_info_result {
                                         Ok(user_info) => {
                                             println!("User info retrieved successfully: {}", user_info);
-                                            window.emit("oauth-success", user_info).unwrap_or_else(|e| {
+                                            window.emit("oauth-success", user_info.clone()).unwrap_or_else(|e| {
                                                 eprintln!("Failed to emit oauth-success event: {}", e);
+                                            });
+                                            save_user_info(app, user_info).unwrap_or_else(|e| {
+                                                eprintln!("Failed to save user info: {}", e);
                                             });
                                         }
                                         Err(e) => {
