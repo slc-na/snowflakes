@@ -18,6 +18,8 @@ mod oauth;
 mod sftp;
 mod ssh;
 mod store;
+mod config;
+mod http;
 
 #[derive(Serialize)]
 struct SystemStats {

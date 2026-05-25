@@ -8,7 +8,7 @@ use tauri_plugin_oauth::OauthConfig;
 pub async fn start_server(window: Window) {
     let port_server = dotenv!("PORT_TEMP_SERVER").to_string();
     let config = OauthConfig {
-        ports: Some(vec![port_server.parse().unwrap_or(8080)]),
+        ports: Some(vec![port_server.parse().unwrap_or(6789)]),
         response: Some("Login successful! You can close this tab.".into()),
     };
 

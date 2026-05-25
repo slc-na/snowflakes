@@ -29,10 +29,19 @@ pub async fn get_token() -> Result<String, String> {
     Ok(token)
 }
 
+pub async fn get_refresh_token() -> Result<String, String> {
+    let entry = Entry::new("snow-flakes", "refresh_token").map_err(|e| e.to_string())?;
+    let token = entry.get_password().map_err(|e| e.to_string())?;
+
+    Ok(token)
+}
+
 #[tauri::command]
 pub async fn delete_token() -> Result<(), String> {
     let entry = Entry::new("snow-flakes", "access_token").map_err(|e| e.to_string())?;
+    let refresh_entry = Entry::new("snow-flakes", "refresh_token").map_err(|e| e.to_string())?;
 
+    refresh_entry.delete_credential().map_err(|e| e.to_string())?;
     entry.delete_credential().map_err(|e| e.to_string())?;
 
     Ok(())

@@ -1,13 +1,7 @@
-// Tauri doesn't have a Node.js server to do proper SSR
-// Tauri doesn't have a Node.js server to do proper SSR
-// so we will use adapter-static to prerender the app (SSG)
-// See: https://v2.tauri.app/start/frontend/sveltekit/ for more info
-// Tauri doesn't have a Node.js server to do proper SSR
-// so we will use adapter-static to prerender the app (SSG)
-// See: https://v2.tauri.app/start/frontend/sveltekit/ for more info
 import { browser } from '$app/environment';
 import { invoke } from '@tauri-apps/api/core';
 import { redirect } from '@sveltejs/kit';
+import { listen } from '@tauri-apps/api/event';
 
 export const prerender = true;
 export const ssr = false;
@@ -26,5 +20,12 @@ export const load = async ({ url }: { url: { pathname: string } }) => {
             }
         }
     }
+
+    const unlisten = await listen('oauth-success', (event) => {
+        console.log('OAuth success');
+        console.log(event.payload);
+    });
+
+
     return {};
 };

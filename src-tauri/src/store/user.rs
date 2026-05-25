@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 use serde_json::Value;
