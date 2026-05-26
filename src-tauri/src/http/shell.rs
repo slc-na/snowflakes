@@ -5,6 +5,7 @@ use tauri::{Manager, Window};
 use crate::config::env::load_backend_url;
 use crate::http::request::get_request;
 use crate::http::request::post_request;
+use crate::http::request::put_request;
 
 // GET method 
 #[tauri::command]
@@ -44,16 +45,17 @@ pub async fn get_shell(window: Window) -> Result<Value, String> {
 #[tauri::command] 
 pub async fn update_shell(
     window: tauri::Window, 
-    params: Value
+    params: Value,
+    shell_id: String
 ) -> Result<Value, String> {
     
     let client = window.state::<Client>();
-    println!("POST request received at /shell with params: {}", params);
+    println!("PUT request received at /shell/{} with params: {}", shell_id, params);
 
     let backend_url = load_backend_url();
-    let full_url = format!("{}api/v1/shell", backend_url);
+    let full_url = format!("{}api/v1/shell/{}", backend_url, shell_id);
     
-    let result: Result<Value, String> = post_request(client.inner(), &full_url, &params).await;
+    let result: Result<Value, String> = put_request(client.inner(), &full_url, &params).await;
 
     match result {
         Ok(parsed_json) => {
@@ -62,7 +64,7 @@ pub async fn update_shell(
             Ok(parsed_json)
         },
         Err(e) => {
-            eprintln!("Error during POST request: {}", e);
+            eprintln!("Error during PUT request: {}", e);
             Err(e) 
         }
     }

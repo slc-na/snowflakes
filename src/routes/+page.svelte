@@ -92,6 +92,39 @@
     }
   }
 
+  async function handleInsertShelL() {
+    try {
+      const result = await invoke('insert_shell', {
+        "params": {
+          "createdBy" : "MX25-1 Testing",
+          "name" : "Test Shell",
+          "description" : "This is a test shell inserted from the Svelte frontend.",
+          "command" : ""
+        }
+      });
+      console.log('Insert shell result:', result);
+    } catch (err) {
+      console.error('Failed to insert shell info:', err);
+    }
+
+  }
+  async function handleUpdateShell() {
+    try {
+      const result = await invoke('update_shell', {
+        "params": {
+          "createdBy" : "MX25-1 Testing",
+          "name" : "Update Shell",
+          "description" : "updating shell from frontend calling the backend.",
+          "command" : "hehe updated again this time"
+        },
+        "shellId": "1"
+      });
+      console.log('Update shell result:', result);
+    } catch (error) {
+      console.error('Failed to update shell info:', error);
+    }
+  }
+
   function formatDate(ts: number): string {
     return new Date(ts).toLocaleString();
   }
@@ -146,6 +179,36 @@
             </svg>
           </div>
           <span class="new-label">Call Get Shell</span>
+        </button>
+        <button class="card card-new" onclick={handleInsertShelL}>
+          <div class="new-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path d="M10 4v12M4 10h12" />
+            </svg>
+          </div>
+          <span class="new-label">Insert New Shell</span>
+        </button>
+        <button class="card card-new" onclick={handleUpdateShell}>
+          <div class="new-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path d="M10 4v12M4 10h12" />
+            </svg>
+          </div>
+          <span class="new-label">Update Shell</span>
         </button>
 
         <!-- Host Cards -->
