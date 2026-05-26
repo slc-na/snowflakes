@@ -7,8 +7,10 @@ use crate::config::env::{
 use reqwest::Client;
 use tauri::State;
 use std::collections::HashMap;
+use crate::oauth::token::get_token;
+use crate::oauth::token::get_refresh_token;
 
-pub async fn send_request_access_token(client: State<'_, Client>, code: &str) -> Result<String, String> {
+pub async fn send_request_access_token(client: &Client, code: &str) -> Result<String, String> {
     println!(
         "Sending request to exchange code for access token with code: {}",
         code
@@ -68,7 +70,7 @@ pub async fn get_user_detail(access_token: &str) -> Result<serde_json::Value, St
 }
 
 
-pub async fn send_request_with_refresh_token(client: State<'_, Client>, refresh_token: &str) -> Result<String, String> {
+pub async fn send_request_with_refresh_token(client: &Client, refresh_token: &str) -> Result<String, String> {
     println!(
         "Sending request to exchange refresh token for access token with refresh token: {}",
         refresh_token
@@ -102,4 +104,4 @@ pub async fn send_request_with_refresh_token(client: State<'_, Client>, refresh_
             return Err(format!("Failed to send token request: {}", e));
         }
     }
-    }
+}

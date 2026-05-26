@@ -51,7 +51,7 @@ pub async fn oauth_is_authenticated(window: Window) -> bool {
     println!("Access token found: {}", access_token);
 
     if get_user_detail(&access_token).await.is_ok() {
-        return true; // Success! Token is valid.
+        return true; 
     }
 
     eprintln!("Failed to retrieve user info. Attempting to use refresh token...");
@@ -63,7 +63,7 @@ pub async fn oauth_is_authenticated(window: Window) -> bool {
 
     println!("Refresh token found: {}", refresh_token);
 
-    let Ok(refresh_text) = send_request_with_refresh_token(client, &refresh_token).await else {
+    let Ok(refresh_text) = send_request_with_refresh_token(client.inner(), &refresh_token).await else {
         eprintln!("Failed to get a response from the refresh token request.");
         return false;
     };
@@ -129,7 +129,7 @@ pub async fn handle_oauth_callback(window: Window, raw_url: String) {
     println!("Successfully extracted Auth Code: {}", auth_code);
 
     let client = window.state::<Client>();
-    let Ok(text) = send_request_access_token(client.clone(), &auth_code).await else {
+    let Ok(text) = send_request_access_token(client.inner(), &auth_code).await else {
         eprintln!("Failed to start access and refresh token retrieval process.");
         return;
     };
@@ -188,4 +188,56 @@ pub async fn handle_oauth_callback(window: Window, raw_url: String) {
             }
         }
     }
+}
+
+
+pub async fn extract_access_refresh_token_from_response(
+    client: &Client,
+) -> Result<(), String> {
+    
+    let token = match get_refresh_token().await {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("No refresh token found: {}", e);
+            return Err(format!("No refresh token found: {}", e));
+        }
+    };
+
+    let Ok(refresh_text) = send_request_with_refresh_token(client, &token).await else {
+        eprintln!("Failed to get a response from the refresh token request.");
+        return Err("Failed to refresh access token".into());
+    };
+    
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(&refresh_text) else {
+        eprintln!("Failed to parse refresh token response as JSON.");
+        return Err("Failed to parse refresh token response".into());
+    };
+
+    let new_access_token = json.get("access_token").and_then(|v| v.as_str());
+    let new_refresh_token = json.get("refresh_token").and_then(|v| v.as_str());
+
+    let Some(valid_new_access) = new_access_token else {
+        eprintln!("Access token not found in the refresh response.");
+        return Err("Failed to obtain new access token".into());
+    };
+
+    if let Err(e) = save_access_token(valid_new_access) {
+        eprintln!("Failed to save new access token: {}", e);
+        return Err("Failed to save new access token".into());
+    } else {
+        println!("New access token saved successfully.");
+    }
+
+    if let Some(valid_new_refresh) = new_refresh_token {
+        if let Err(e) = save_refresh_token(valid_new_refresh) {
+            eprintln!("Failed to save new refresh token: {}", e);
+            return Err("Failed to save new refresh token".into());
+        } else {
+            println!("New refresh token saved successfully.");
+        }
+    } else {
+        eprintln!("Warning: No new refresh token provided in the response.");
+    }
+
+    Ok(())
 }
