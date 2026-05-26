@@ -11,6 +11,8 @@
   import type { SessionInfo } from "../types/settings";
   import { deleteSessionInfo, loadAllSessions } from "../controller/local";
   import { clearTerminalState } from "../controller/session";
+  import { invoke } from '@tauri-apps/api/core';
+  
 
   let isModalOpen = $state(false);
   let sessions = $state<SessionInfo[]>([]);
@@ -70,6 +72,26 @@
     isModalOpen = true;
   }
 
+  async function handleGetServer() {
+    try {
+      const serverInfo = await invoke('get_server');
+      console.log('Received server info:', serverInfo);
+    } catch (err) {
+      console.error('Failed to get server info:', err);
+      alert('Error fetching server info. Check console for details.');
+    }
+  }
+
+  async function handleGetShell() {
+    try {
+      const shellInfo = await invoke('get_shell');
+      console.log('Received shell info:', shellInfo);
+    } catch (err) {
+      console.error('Failed to get shell info:', err);
+      alert('Error fetching shell info. Check console for details.');
+    }
+  }
+
   function formatDate(ts: number): string {
     return new Date(ts).toLocaleString();
   }
@@ -94,6 +116,36 @@
             </svg>
           </div>
           <span class="new-label">New host</span>
+        </button>
+        <button class="card card-new" onclick={handleGetServer}>
+          <div class="new-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path d="M10 4v12M4 10h12" />
+            </svg>
+          </div>
+          <span class="new-label">Call Get Server</span>
+        </button>
+        <button class="card card-new" onclick={handleGetShell}>
+          <div class="new-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path d="M10 4v12M4 10h12" />
+            </svg>
+          </div>
+          <span class="new-label">Call Get Shell</span>
         </button>
 
         <!-- Host Cards -->

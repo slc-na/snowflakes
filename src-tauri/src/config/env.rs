@@ -27,3 +27,7 @@ pub fn load_secret_key() -> String {
 pub fn load_base_uri() -> String {
     dotenv!("BASE_URI").to_string()
 }
+
+pub fn load_backend_url() -> String {
+    dotenv!("BACKEND_URL").to_string()
+}

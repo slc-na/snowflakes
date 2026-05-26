@@ -5,10 +5,7 @@ use crate::config::env::{
     load_secret_key
 };
 use reqwest::Client;
-use tauri::State;
 use std::collections::HashMap;
-use crate::oauth::token::get_token;
-use crate::oauth::token::get_refresh_token;
 
 pub async fn send_request_access_token(client: &Client, code: &str) -> Result<String, String> {
     println!(

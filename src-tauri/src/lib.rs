@@ -128,7 +128,11 @@ pub fn run() {
             oauth::token::delete_token,
             oauth::auth::open_oauth_login,
             oauth::auth::oauth_is_authenticated,
-            store::user::get_user_info
+            store::user::get_user_info,
+            http::server::get_server,
+            http::shell::get_shell,
+            http::shell::update_shell,
+            http::shell::insert_shell
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
