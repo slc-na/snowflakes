@@ -1,4 +1,6 @@
+import type { ServerAttribute } from "../types/servers";
 import { DEFAULT_SETTINGS, type SessionInfo, type SnowflakesSettings } from "../types/settings";
+import { invoke } from '@tauri-apps/api/core';
 
 const SETTINGS_KEY = "snowflakes_settings";
 
@@ -48,4 +50,14 @@ export async function loadAllSessions(): Promise<SessionInfo[]> {
     return sessions;
 }
 
-
+export async function getAllServers() : Promise<ServerAttribute[]>{
+    const raw: any = await invoke("get_server");
+    const data = raw.data;
+    const servers: ServerAttribute[] = data.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        ip: item.ip,
+        description: item.description,
+    }));
+    return servers;
+}
