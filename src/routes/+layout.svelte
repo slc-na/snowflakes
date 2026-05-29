@@ -8,12 +8,15 @@
 		Settings,
 		LayoutGrid,
 		Clock,
+		Sun,
+		Moon
 	} from "@lucide/svelte";
 	import SidebarElement from "../components/home/SidebarElement.svelte";
 	import "../layout.css";
 	import TitleBar from "../components/TitleBar.svelte";
 	import SessionTabBar from "../components/terminal/SessionTabBar.svelte";
 	import { Toaster } from 'svelte-sonner';
+	import { onMount } from "svelte";
 
 	const menus = [
 		{ icon: House, text: "HOME", href: "/" },
@@ -24,6 +27,28 @@
 		{ icon: LayoutGrid, text: "MULTI WINDOW", href: "/window" },
 		{ icon: Settings, text: "SETTINGS", href: "/settings" },
 	];
+
+	let theme = $state("dark");
+
+	onMount(() => {
+		const stored = localStorage.getItem("sf-theme");
+		if (stored === "light") {
+			theme = "light";
+			document.documentElement.setAttribute("data-theme", "light");
+		}
+	});
+
+	function toggleTheme() {
+		if (theme === "dark") {
+			theme = "light";
+			document.documentElement.setAttribute("data-theme", "light");
+			localStorage.setItem("sf-theme", "light");
+		} else {
+			theme = "dark";
+			document.documentElement.removeAttribute("data-theme");
+			localStorage.setItem("sf-theme", "dark");
+		}
+	}
 
 	let showTabBar = $derived(menus.some(
 		(menu) =>
@@ -65,6 +90,16 @@
 					/>
 				{/each}
 			</nav>
+			
+			<div class="sidebar-spacer"></div>
+
+			<button class="theme-toggle" onclick={toggleTheme}>
+				{#if theme === 'dark'}
+				  <Sun size={16} /> <span class="toggle-text">LIGHT MODE</span>
+				{:else}
+				  <Moon size={16} /> <span class="toggle-text">DARK MODE</span>
+				{/if}
+			</button>
 		</aside>
 
 		<div class="app-layout">
@@ -135,5 +170,35 @@
 		flex-direction: column;
 		gap: 4px;
 		padding: 0 8px;
+	}
+
+	.sidebar-spacer {
+		flex: 1;
+	}
+
+	.theme-toggle {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin: 16px 8px;
+		padding: 10px 14px;
+		background: transparent;
+		border: none;
+		border-radius: var(--sf-radius-md);
+		color: var(--sf-text-secondary);
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.theme-toggle:hover {
+		background: var(--sf-bg-hover);
+		color: var(--sf-text-primary);
+	}
+
+	.toggle-text {
+		font-family: var(--sf-font-ui);
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 1px;
 	}
 </style>
