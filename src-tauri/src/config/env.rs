@@ -31,3 +31,7 @@ pub fn load_base_uri() -> String {
 pub fn load_backend_url() -> String {
     dotenv!("BACKEND_URL").to_string()
 }
+
+pub fn load_bastion_ip() -> String {
+    dotenv!("BASTION_IP").to_string()
+}

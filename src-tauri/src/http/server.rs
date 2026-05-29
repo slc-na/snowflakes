@@ -2,7 +2,7 @@ use reqwest::Client;
 use serde_json::Value;
 use tauri::{Manager, Window};
 
-use crate::config::env::load_backend_url;
+use crate::config::env::{load_backend_url, load_bastion_ip};
 use crate::http::request::get_request;
 
 // GET method 
@@ -38,4 +38,10 @@ pub async fn get_server(window: Window) -> Result<Value, String> {
             Err(e) 
         }
     }
+}
+#[tauri::command]
+pub async fn get_bastion_ip() -> Result<String, String> {
+    let bastion_ip = load_bastion_ip();
+    println!("Loaded Bastion IP: {}", bastion_ip);
+    Ok(bastion_ip)
 }

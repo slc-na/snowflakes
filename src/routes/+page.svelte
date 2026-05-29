@@ -72,6 +72,25 @@
     isModalOpen = true;
   }
 
+  async function handleGetUserInfo(){
+    try {
+      const userInfo = await invoke('get_user_info');
+      console.log('Received user info:', userInfo);
+    } catch (err) {
+      console.error('Failed to get user info:', err);
+      alert('Error fetching user info. Check console for details.');
+    }
+  }
+  async function handleGetBastionIp(){
+    try {
+      const bastionIp = await invoke('get_bastion_ip');
+      console.log('Received bastion IP:', bastionIp);
+    } catch (err) {
+      console.error('Failed to get bastion IP:', err);
+      alert('Error fetching bastion IP. Check console for details.');
+    }
+  }
+
   async function handleGetServer() {
     try {
       const serverInfo = await invoke('get_server');
@@ -135,6 +154,36 @@
     <div class="host-container">
       <div class="grid">
         <!-- Add New Card -->
+        <button class="card card-new" onclick={handleGetUserInfo}>
+          <div class="new-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path d="M10 4v12M4 10h12" />
+            </svg>
+          </div>
+          <span class="new-label">Get User Info</span>
+        </button>
+        <button class="card card-new" onclick={handleGetBastionIp}>
+          <div class="new-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path d="M10 4v12M4 10h12" />
+            </svg>
+          </div>
+          <span class="new-label">Get Bastion IP</span>
+        </button>
         <button class="card card-new" onclick={handleNewHost}>
           <div class="new-icon">
             <svg

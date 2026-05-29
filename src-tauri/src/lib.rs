@@ -132,7 +132,8 @@ pub fn run() {
             http::server::get_server,
             http::shell::get_shell,
             http::shell::update_shell,
-            http::shell::insert_shell
+            http::shell::insert_shell,
+            http::server::get_bastion_ip
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

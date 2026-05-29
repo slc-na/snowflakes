@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { invoke } from '@tauri-apps/api/core';
     import {
         saveDefaultAccount,
         loadDefaultAccount,
@@ -51,10 +52,54 @@
             sshTemplate = settings.sshTemplate;
             apiKey = settings.apiKey;
             backendUrl = settings.backendUrl;
-
+            
             const account = await loadDefaultAccount();
             accountUsername = account.username;
             accountPassword = account.password;
+         
+            // getting username based on oauth
+            if(!accountUsername){
+                const oauthUser: any = await invoke("get_user_info");
+                if (oauthUser && oauthUser.username) {
+                    accountUsername = oauthUser.username + "@ad.slc.net";
+                }
+
+                const account: DefaultAccount = {
+                    username: accountUsername,
+                    password: accountPassword,
+                };
+                await saveDefaultAccount(account);
+            }
+
+            // get bastion IP from backend if not set 
+            if(!bastionIp){
+                try {
+                    const bastionIpResult: any = await invoke("get_bastion_ip");
+                    if (bastionIpResult) {
+                        bastionIp = bastionIpResult;
+
+                        // Save the fetched bastion IP to settings
+                        const settings: SnowflakesSettings = {
+                            bastionIp,
+                            sshTemplate,
+                            apiKey,
+                            backendUrl,
+                        };
+                        await saveSettings(settings);
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch backend config:", err);
+                }
+            }
+
+
+            if(!accountUsername.endsWith("@ad.slc.net")){
+                const account: DefaultAccount = {
+                    username: accountUsername + "@ad.slc.net",
+                    password: accountPassword,
+                };
+                await saveDefaultAccount(account);
+            }
 
             sessions = await loadAllSessions();
         } catch (err) {
