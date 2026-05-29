@@ -7,6 +7,7 @@
 		ArrowLeftRight,
 		Settings,
 		LayoutGrid,
+		Clock,
 	} from "@lucide/svelte";
 	import SidebarElement from "../components/home/SidebarElement.svelte";
 	import "../layout.css";
@@ -16,6 +17,7 @@
 
 	const menus = [
 		{ icon: House, text: "HOME", href: "/" },
+		{ icon: Clock, text: "RECENTS", href: "/recents" },
 		{ icon: Folders, text: "FILES", href: "/files" },
 		{ icon: ShieldCheck, text: "KNOWN HOSTS", href: "/hosts" },
 		{ icon: ArrowLeftRight, text: "PORT FORWARDING", href: "/ports" },
