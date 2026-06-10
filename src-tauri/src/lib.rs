@@ -2,6 +2,7 @@
 
 use crate::sftp::sftp_engine::SftpEngine;
 use crate::ssh::ssh_engine::SshEngine;
+use reqwest::Client;
 use serde::Serialize;
 use ssh::input::send_ssh_input;
 use ssh::manage_session::disconnect;
@@ -15,8 +16,12 @@ use sysinfo::System;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_updater::UpdaterExt;
 
+mod oauth;
 mod sftp;
 mod ssh;
+mod store;
+mod config;
+mod http;
 
 #[derive(Serialize)]
 struct SystemStats {
@@ -68,6 +73,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_stronghold::Builder::new(|password| {
@@ -104,9 +110,12 @@ pub fn run() {
         })
         .manage(metric_state)
         .manage(ssh_state)
+        .manage(Client::new())
         .manage(SftpEngine(Arc::new(Mutex::new(HashMap::new()))))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_oauth::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             get_system_stats,
@@ -121,6 +130,17 @@ pub fn run() {
             sftp::list::sftp_list_dir,
             sftp::download::sftp_download_file,
             sftp::upload::sftp_upload_file,
+            oauth::server::start_server,
+            oauth::token::get_token,
+            oauth::token::delete_token,
+            oauth::auth::open_oauth_login,
+            oauth::auth::oauth_is_authenticated,
+            store::user::get_user_info,
+            http::server::get_server,
+            http::shell::get_shell,
+            http::shell::update_shell,
+            http::shell::insert_shell,
+            http::server::get_bastion_ip
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

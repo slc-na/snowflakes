@@ -1,7 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { invoke } from "@tauri-apps/api/core";
-    import { onMount } from "svelte";
     import { loadDefaultAccount } from "../../controller/vault";
     import { connectToSession } from "../../controller/ssh";
     import type { SnowflakesSettings, SessionInfo } from "../../types/settings";
@@ -30,27 +29,41 @@
         prefill?: SessionInfo | null;
     }>();
 
-    onMount(async () => {
-        try {
-            const settings = await loadSettings();
-            bastionIp = settings.bastionIp;
-            sshTemplate = settings.sshTemplate;
+    // Re-populate fields every time the modal opens so server-card prefill works
+    $effect(() => {
+        if (!isOpen) return;
+        (async () => {
+            try {
+                const settings = await loadSettings();
+                bastionIp = settings.bastionIp;
+                sshTemplate = settings.sshTemplate;
 
-            const account = await loadDefaultAccount();
+                const account = await loadDefaultAccount();
 
-            if (prefill) {
-                hostname = prefill.targetIp;
-                username = prefill.username;
-                password = prefill.password || "";
-                label = prefill.label;
-                bastionIp = prefill.bastionIp || bastionIp;
-            } else {
-                if (account.username) username = account.username;
-                if (account.password) password = account.password;
+                // Reset fields first
+                hostname = "";
+                port = "22";
+                username = "";
+                password = "";
+                label = "";
+                errorMsg = "";
+                isConnecting = false;
+                connectingStatus = "";
+
+                if (prefill) {
+                    hostname = prefill.targetIp;
+                    username = prefill.username || (account.username ?? "");
+                    password = prefill.password || (account.password ?? "");
+                    label = prefill.label;
+                    bastionIp = prefill.bastionIp || bastionIp;
+                } else {
+                    if (account.username) username = account.username;
+                    if (account.password) password = account.password;
+                }
+            } catch (err) {
+                console.error("[NewHostModal] failed to load settings:", err);
             }
-        } catch (err) {
-            console.error("[NewHostModal] failed to load settings:", err);
-        }
+        })();
     });
 
     let sshCommand = $derived(
