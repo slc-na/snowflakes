@@ -15,6 +15,8 @@
     "core:window:allow-set-focus",
     "core:window:allow-start-dragging",
     "core:window:allow-is-maximized",
+    "core:menu:allow-new",
+    "core:menu:allow-popup",
     "opener:default",
     "stronghold:default",
     "stronghold:allow-remove-store-record",

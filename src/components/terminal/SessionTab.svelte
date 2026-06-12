@@ -1,4 +1,8 @@
 <script lang="ts">
+    import { onDestroy, onMount } from "svelte";
+    import { listen } from "@tauri-apps/api/event";
+    import { Menu } from "@tauri-apps/api/menu";
+
     type SessionStatus = "connected" | "connecting" | "disconnected" | "error";
 
     export let id: string;
@@ -9,6 +13,10 @@
 
     export let onselect: (id: string) => void = () => {};
     export let onclose: (id: string) => Promise<void> = async () => {};
+    export let onduplicate: (id: string) => Promise<void> = async () => {};
+
+    let menuPromise : any;
+    let unlistenPromise : any;
 
     function handleClick(): void {
         onselect(id);
@@ -30,6 +38,11 @@
         }
     }
 
+    function handleDuplicate(){
+        onduplicate(id)
+    }
+
+
     $: statusColor =
         status === "connected"
             ? "var(--sf-status-online)"
@@ -47,6 +60,52 @@
               : status === "error"
                 ? "error"
                 : "offline";
+
+
+    onMount(() => {
+        // 1. Initialize the native menu
+        menuPromise = Menu.new({
+        items: [
+            { id: "session_menu_duplicate", text: "Duplicate", action: handleDuplicate },
+            { id: "session_menu_close", text: "Close", action: () => handleClose(undefined) }
+        ],
+        });
+
+        // 2. Listen for menu selection events globally
+        unlistenPromise = listen("menu-event", (event) => {
+        const payload = event.payload;
+        
+        // Filter events by prefix to ensure they belong to this context menu
+        if (typeof payload === "string" && payload.startsWith("ctx")) {
+            switch (payload) {
+            case "ctx_option1":
+                console.log("Option 1 clicked");
+                break;
+            case "ctx_option2":
+                console.log("Option 2 clicked");
+                break;
+            default:
+                console.log("Unimplemented menu id:", payload);
+            }
+        }
+        });
+    });       
+    
+    // 3. Cleanup the event listener on component destroy
+    onDestroy(async () => {
+        if (unlistenPromise) {
+        const unlisten = await unlistenPromise;
+        unlisten();
+        }
+    });
+
+    async function handleContextMenu(event : MouseEvent) {
+        console.log()
+        event.preventDefault(); // Prevent the default browser context menu
+        const menu = await menuPromise;
+        menu.popup(); // Trigger the Tauri native popup
+    }
+
 </script>
 
 <button
@@ -62,6 +121,7 @@
     title="{label} — {statusLabel}"
     on:click={handleClick}
     on:keydown={handleKeydown}
+    on:contextmenu={handleContextMenu}
 >
     <!-- Status dot with pulse for connecting -->
     <span

@@ -3,6 +3,7 @@ export type SnowflakesSettings = {
     sshTemplate: string;
     apiKey: string;
     backendUrl: string;
+    fontSize: number;
 };
 
 export type SessionInfo = {
@@ -25,4 +26,5 @@ export const DEFAULT_SETTINGS: SnowflakesSettings = {
     sshTemplate: "ssh -t {username}@{bastion} ssh {username}@{target}",
     apiKey: "",
     backendUrl: "",
+    fontSize: 13
 };

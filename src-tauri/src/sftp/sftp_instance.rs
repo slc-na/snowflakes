@@ -23,7 +23,7 @@ impl SftpInstance {
             .map_err(|e| format!("Handshake gagal: {}", e.message()))?;
 
         sess.userauth_password(&initial_username, &initial_password)
-            .map_err(|e| format!("Login gagal: {}", e.message()))?;
+            .map_err(|e| format!("Login gagal : {}", e.message()))?;
 
         if !sess.authenticated() {
             return Err("Autentikasi gagal".into());

@@ -5,7 +5,10 @@
     import { listen, type UnlistenFn } from "@tauri-apps/api/event";
     import SessionTab from "./SessionTab.svelte";
     import { page } from "$app/state";
-    import { deleteSession } from "../../controller/ssh";
+    import { connectToSession, deleteSession } from "../../controller/ssh";
+    import ErrorModal from "../modal/ErrorModal.svelte";
+    import { loadSessionInfo } from "../../controller/local";
+    import { loadSessionPass } from "../../controller/vault";
 
     type SessionStatus = "connected" | "connecting" | "disconnected" | "error";
 
@@ -24,6 +27,7 @@
     let overflowLeft: boolean = false;
     let overflowRight: boolean = false;
     let unlistenSessionUpdated: UnlistenFn | null = null;
+    let connectingStatus = ""
 
     $: activeSession = sessions.find((s) => s.id === activeId) ?? null;
     $: connectedCount = sessions.filter((s) => s.status === "connected").length;
@@ -78,6 +82,35 @@
         tick().then(() => scrollTabIntoView(id));
         console.log(`/session?key=${encodeURIComponent(id)}`);
         goto(`/session?key=${encodeURIComponent(id)}`);
+    }
+
+    async function duplicateSession(id: string): Promise<void> {
+        
+        let sessionInfo = await loadSessionInfo(id)
+        if(!sessionInfo) {
+            throw new Error("Session info not found")
+        }
+
+        const password = await loadSessionPass(sessionInfo.sessionKey);
+        if(!password){
+            throw new Error("Session password not found")
+        }
+
+        sessionInfo.password = password
+        connectToSession(
+            sessionInfo,
+            (msg) => {
+                connectingStatus = msg;
+            }
+        )
+    
+
+        // TODO
+
+        // activeId = id;
+        // tick().then(() => scrollTabIntoView(id));
+        // console.log(`/session?key=${encodeURIComponent(id)}`);
+        // goto(`/session?key=${encodeURIComponent(id)}`);
     }
 
     async function closeSession(id: string): Promise<void> {
@@ -170,6 +203,7 @@
                     hasActivity={session.hasActivity ?? false}
                     onselect={selectSession}
                     onclose={closeSession}
+                    onduplicate={duplicateSession}
                 />
             </div>
         {:else}

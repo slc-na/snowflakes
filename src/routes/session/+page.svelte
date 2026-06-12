@@ -16,6 +16,11 @@
         loadTerminalState,
     } from "../../controller/session";
     import { goto } from "$app/navigation";
+    import { incrementTerminalFont, setTerminalFont } from "../../lib/resizeTerminal";
+    
+    import {
+        loadSettings,
+    } from "../../controller/local";
     // Ambil IP dari query param ?ip=...
     let targetKey = $derived($page.url.searchParams.get("key") || "unknown");
     let session = $state<SessionInfo | null>(null);
@@ -25,11 +30,13 @@
     let unlistenError: UnlistenFn;
     let isOpenerrorMessage = $state(false);
     let errorMessage = $state("");
+    let heldKeys = $state([])
 
     let currentSshKey = $state<string | null>(null);
     let serializeAddon = $state<SerializeAddon | null>(null);
 
     onMount(() => {
+
         const term = new Terminal({
             theme: {
                 background: "#1a1b26",
@@ -40,11 +47,19 @@
             fontFamily: "JetBrains Mono, monospace",
             fontSize: 13,
         });
+
+
         console.log(targetKey);
         const now = new Date().toLocaleString();
 
         const fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
+
+        
+        loadSettings().then(setting=>{
+          setTerminalFont(term, fitAddon, setting.fontSize)  
+        })
+        
 
         serializeAddon = new SerializeAddon();
         term.loadAddon(serializeAddon);
@@ -122,16 +137,10 @@
             if (e.ctrlKey) {
                 if (e.key === "=" || e.key === "+") {
                     e.preventDefault();
-                    if (term.options.fontSize && term.options.fontSize < 40) {
-                        term.options.fontSize += 1;
-                        fitAddon.fit();
-                    }
+                    incrementTerminalFont(term, fitAddon, 1)
                 } else if (e.key === "-") {
                     e.preventDefault();
-                    if (term.options.fontSize && term.options.fontSize > 6) {
-                        term.options.fontSize -= 1;
-                        fitAddon.fit();
-                    }
+                    incrementTerminalFont(term, fitAddon, -1)
                 } else if (e.key === "0") {
                     e.preventDefault();
                     term.options.fontSize = 13;
@@ -139,6 +148,25 @@
                 }
             }
         };
+        
+        const handleScroll = (e : WheelEvent) => {
+            if(!e.ctrlKey){
+                return
+            }
+            
+            // if scroll up > resize up
+            e.preventDefault();
+            let increment = 0;
+
+            if(e.deltaY > 0){
+                increment = -1
+            }else{
+                increment = 1
+            }
+
+            incrementTerminalFont(term, fitAddon, increment)
+            // if scroll down > resize down
+        }
 
         $effect(() => {
             if (targetKey !== currentSshKey) {
@@ -157,8 +185,11 @@
                 }
             }
         });
+
+
         window.addEventListener("resize", handleResize);
         window.addEventListener("keydown", handleKeyDown);
+        window.addEventListener("wheel", handleScroll);
 
         return () => {
             if (

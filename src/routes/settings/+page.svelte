@@ -23,6 +23,9 @@
     let sshTemplate = $state(DEFAULT_SETTINGS.sshTemplate);
     let apiKey = $state("");
     let backendUrl = $state("");
+    let fontSize = $state(13);
+
+    let fontSizeOptions = $state(Array(40).keys().map(size => size + 6))
 
     let accountUsername = $state("");
     let accountPassword = $state("");
@@ -52,6 +55,8 @@
             sshTemplate = settings.sshTemplate;
             apiKey = settings.apiKey;
             backendUrl = settings.backendUrl;
+            fontSize = settings.fontSize;
+            
             
             const account = await loadDefaultAccount();
             accountUsername = account.username;
@@ -84,6 +89,7 @@
                             sshTemplate,
                             apiKey,
                             backendUrl,
+                            fontSize
                         };
                         await saveSettings(settings);
                     }
@@ -102,6 +108,7 @@
             }
 
             sessions = await loadAllSessions();
+
         } catch (err) {
             console.error("[Settings] load error:", err);
         }
@@ -114,6 +121,7 @@
                 sshTemplate,
                 apiKey,
                 backendUrl,
+                fontSize,
             };
             saveSettings(settings);
 
@@ -331,6 +339,25 @@
                     {/if}
                 </div>
             {/if}
+        </section>
+
+
+        <!-- font size selection -->
+        <section class="section">
+            <h2 class="section-title">Preferred Font Size</h2>
+            <div class="section-body">
+                <div class="field">
+                    <label for="acct-username">Font Size</label>
+
+                    <select bind:value={fontSize}>
+                        {#each fontSizeOptions as num}
+                            <option value={num}>
+                                {num}px
+                            </option>
+                        {/each}
+                    </select>
+                </div>
+            </div>
         </section>
 
         <!-- Save -->

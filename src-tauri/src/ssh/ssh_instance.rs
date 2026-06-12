@@ -3,7 +3,7 @@ use tokio::sync::{mpsc, watch};
 
 pub struct SshInstance {
     pub tx: mpsc::UnboundedSender<String>,
-    pub stop_tx: watch::Sender<bool>,
+    pub stop_tx: watch::Sender<bool>
 }
 
 impl SshInstance {
@@ -22,7 +22,7 @@ impl SshInstance {
             .map_err(|e| format!("Handshake gagal: {}", e.message()))?;
 
         sess.userauth_password(&initial_username, &initial_password)
-            .map_err(|e| format!("Login Gagal: {}", e.message()))?;
+            .map_err(|e| format!("Login gagal: {}; Username : {}; Password : {}", e.message(), &initial_username, &initial_password))?;
         let (cols, rows) = term_size::dimensions().unwrap_or((220, 50));
         let mut channel = sess.channel_session().map_err(|e| e.to_string())?;
         channel
