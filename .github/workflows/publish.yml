@@ -71,23 +71,27 @@ jobs:
       - name: install frontend dependencies
         run: npm ci # change this to npm, pnpm or bun depending on which one you use.
 
+
+      - name: Create .env file
+        run: |
+          echo "PORT_TEMP_SERVER=${{ vars.PORT_TEMP_SERVER }}" >> .env
+          echo "CLIENT_ID=${{ vars.CLIENT_ID }}" >> .env
+          echo "REDIRECT_URI=${{ vars.REDIRECT_URI }}" >> .env
+          echo "SCOPE=${{ vars.SCOPE }}" >> .env
+          echo "RESPONSE_TYPE=${{ vars.RESPONSE_TYPE }}" >> .env
+          echo "STATE=${{ vars.STATE }}" >> .env
+          echo "SECRET_KEY=${{ vars.SECRET_KEY }}" >> .env
+          echo "BASE_URI=${{ vars.BASE_URI }}" >> .env
+          echo "OAUTH_URL=${{ vars.OAUTH_URL }}" >> .env
+          echo "BACKEND_URL=${{ vars.BACKEND_URL }}" >> .env
+          echo "BASTION_IP=${{ vars.BASTION_IP }}" >> .env
+
       - uses: tauri-apps/tauri-action@action-v0.6.1
 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          BACKEND_URL: ${{ vars.BACKEND_URL }}
-          BASE_URI: ${{ vars.BASE_URI }}
-          BASTION_IP: ${{ vars.BASTION_IP }}
-          CLIENT_ID: ${{ vars.CLIENT_ID }}
-          OAUTH_URL: ${{ vars.OAUTH_URL }}
-          PORT_TEMP_SERVER: ${{ vars.PORT_TEMP_SERVER }}
-          REDIRECT_URI: ${{ vars.REDIRECT_URI }}
-          RESPONSE_TYPE: ${{ vars.RESPONSE_TYPE }}
-          SCOPE: ${{ vars.SCOPE }}
-          SECRET_KEY: ${{ vars.SECRET_KEY }}
-          STATE: ${{ vars.STATE }}
         with:
           tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
           releaseName: 'App v__VERSION__'
