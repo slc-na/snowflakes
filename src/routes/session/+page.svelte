@@ -45,6 +45,7 @@
     };
 
 
+    // ini handle key event yg diluar terminal
     function handleKeyDown(e: KeyboardEvent){
 
         if (e.ctrlKey) {
@@ -61,6 +62,7 @@
             }
         }
     };
+
 
     function handleScroll(e : WheelEvent){
         if(!e.ctrlKey){
@@ -158,6 +160,8 @@
             term.writeln("");
         }
 
+
+        // listen to tauri emitted event
         unlisten = await listen(eventName, (event) => {
 
             // console.debug("user typed : " + event.payload)
@@ -175,6 +179,9 @@
         let inputBuffer = "";
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+
+
+        // 
         let detachTermOnData = term.onData((data: string) => {
             inputBuffer += data;
 
@@ -194,9 +201,17 @@
             }, 70);
         });
 
+        let detachTermOnSelection =  term.onSelectionChange(() => {
+            const selection = term.getSelection();
+            if (selection) {
+                navigator.clipboard.writeText(selection);
+            }
+        })
+
         cleanupSsh = function(){
             console.debug(`Session : ${session?.sessionKey} : SSH cleaned up`)
-            detachTermOnData.dispose(); // xterm's IDisposable
+            detachTermOnData.dispose(); //lepasin onData
+            detachTermOnSelection.dispose() //lepasin onSelect
             if (debounceTimer) clearTimeout(debounceTimer);
         };
 
