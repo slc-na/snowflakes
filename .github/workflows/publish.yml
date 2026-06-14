@@ -5,7 +5,8 @@ on:
     branches:
       - release
 
-# This workflow will trigger on each push to the `release` branch to create or update a GitHub release, build your app, and upload the artifacts to the release.
+# This is the example from the readme.
+# On each push to the `release` branch it will create or update a GitHub release, build your app, and upload the artifacts to the release.
 
 jobs:
   publish-tauri:
@@ -15,18 +16,40 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # for Arm based macs (M1 and above).
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest' # for Intel based macs.
-            args: '--target x86_64-apple-darwin'
-          - platform: 'ubuntu-22.04'
-            args: ''
+          # - platform: 'macos-latest' # for Arm based macs (M1 and above).
+          #   args: '--target aarch64-apple-darwin'
+          # - platform: 'ubuntu-22.04' # for Tauri v1 you could replace this with ubuntu-20.04.
+          #   args: ''
           - platform: 'windows-latest'
             args: ''
 
     runs-on: ${{ matrix.platform }}
+    environment: release
     steps:
       - uses: actions/checkout@v4
+
+      - name: print variables
+        shell: bash
+        run: |
+          echo "--- Environment Secret Check ---"
+          
+          echo "SECRET_VALUE (via alias):"
+          if [ -z "$SECRET_VALUE" ]; then echo "  Status: EMPTY"; else echo "  Status: LOADED (${#SECRET_VALUE} chars)"; fi
+          
+          echo "TAURI_SIGNING_PRIVATE_KEY:"
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then echo "  Status: EMPTY"; else echo "  Status: LOADED (${#TAURI_SIGNING_PRIVATE_KEY} chars)"; fi
+          
+          echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD:"
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then echo "  Status: EMPTY"; else echo "  Status: LOADED (${#TAURI_SIGNING_PRIVATE_KEY_PASSWORD} chars)"; fi
+          
+          echo "--------------------------------"
+          echo "Raw Masked Output (should show ***):"
+          echo "Key: $TAURI_SIGNING_PRIVATE_KEY"
+          echo "Pass: $TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+        env:
+          SECRET_VALUE: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -37,7 +60,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04' # This must match the platform value defined above.
@@ -48,9 +71,12 @@ jobs:
       - name: install frontend dependencies
         run: npm install # change this to npm, pnpm or bun depending on which one you use.
 
-      - uses: tauri-apps/tauri-action@v1
+      - uses: tauri-apps/tauri-action@action-v0.6.1
+
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
           releaseName: 'App v__VERSION__'
