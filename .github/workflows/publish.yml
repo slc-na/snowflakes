@@ -77,6 +77,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          BASE_URI: ${{ vars.BASE_URI }}
+          BASTION_IP: ${{ vars.BASTION_IP }}
+          CLIENT_ID: ${{ vars.CLIENT_ID }}
+          OAUTH_URL: ${{ vars.OAUTH_URL }}
+          PORT_TEMP_SERVER: ${{ vars.PORT_TEMP_SERVER }}
+          REDIRECT_URI: ${{ vars.REDIRECT_URI }}
+          RESPONSE_TYPE: ${{ vars.RESPONSE_TYPE }}
+          SCOPE: ${{ vars.SCOPE }}
+          SECRET_KEY: ${{ vars.SECRET_KEY }}
+          STATE: ${{ vars.STATE }}
         with:
           tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
           releaseName: 'App v__VERSION__'
