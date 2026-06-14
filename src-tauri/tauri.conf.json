@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "snowflakes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.snowflakes.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -47,7 +47,7 @@
 
         "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ0QzhGQTczNTg1QUI3MUQKUldRZHQxcFljL3JJUkgxNnpyQzB6czZRNW4vNU1QRGlDK3ZJajlPYUJvckdscTNKSXE0ZlVtb1gK",
         "endpoints": [
-          "https://api.jsonbin.io/v3/b/6a03f013c0954111d8165c44?meta=false"
+          "https://github.com/slc-na/snowflakes/releases/download/untagged-85d45918ef7faab9b6da/latest.json"
         ]
       }
     }
