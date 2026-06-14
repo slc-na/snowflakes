@@ -22,6 +22,7 @@
         loadSettings,
     } from "../../controller/local";
     // Ambil IP dari query param ?ip=...
+
     let targetKey = $derived($page.url.searchParams.get("key") || "unknown");
     let session = $state<SessionInfo | null>(null);
     let terminalElement: HTMLElement;
@@ -30,14 +31,59 @@
     let unlistenError: UnlistenFn;
     let isOpenerrorMessage = $state(false);
     let errorMessage = $state("");
-    let heldKeys = $state([])
 
     let currentSshKey = $state<string | null>(null);
     let serializeAddon = $state<SerializeAddon | null>(null);
+        
+    let term : Terminal = $state(new Terminal());
+    let fitAddon : FitAddon;
+    let cleanupSsh : () => void;
 
-    onMount(() => {
 
-        const term = new Terminal({
+    function handleResize() {
+        fitAddon.fit()
+    };
+
+
+    function handleKeyDown(e: KeyboardEvent){
+
+        if (e.ctrlKey) {
+            if (e.key === "=" || e.key === "+") {
+                e.preventDefault();
+                incrementTerminalFont(term, fitAddon, 1)
+            } else if (e.key === "-") {
+                e.preventDefault();
+                incrementTerminalFont(term, fitAddon, -1)
+            } else if (e.key === "0") {
+                e.preventDefault();
+                term.options.fontSize = 13;
+                fitAddon.fit();
+            }
+        }
+    };
+
+    function handleScroll(e : WheelEvent){
+        if(!e.ctrlKey){
+            return
+        }
+        
+        // if scroll up > resize up
+        e.preventDefault();
+        let increment = 0;
+
+        if(e.deltaY > 0){
+            increment = -1
+        }else{
+            increment = 1
+        }
+
+        incrementTerminalFont(term, fitAddon, increment)
+        // if scroll down > resize down
+    }
+
+
+    function setupTerminal(){
+        term = new Terminal({
             theme: {
                 background: "#1a1b26",
                 foreground: "#a9b1d6",
@@ -50,14 +96,13 @@
 
 
         console.log(targetKey);
-        const now = new Date().toLocaleString();
 
-        const fitAddon = new FitAddon();
+        fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
 
         
         loadSettings().then(setting=>{
-          setTerminalFont(term, fitAddon, setting.fontSize)  
+            setTerminalFont(term!, fitAddon, setting.fontSize)  
         })
         
 
@@ -67,151 +112,176 @@
         term.open(terminalElement);
         fitAddon.fit();
         term.focus();
+    }
 
-        const setupSsh = async (key: string) => {
-            const currentSession = await loadSessionInfo(key);
-            if (!currentSession) {
-                term.writeln(
-                    `\r\n\x1b[31mError: Session info not found for key: ${key}\x1b[0m`,
-                );
-                return;
-            }
-            session = currentSession;
 
-            const eventName = `ssh-output-${key}`;
+    async function setupSsh(key : string){
 
-            const previousState = loadTerminalState(key);
-            if (previousState) {
-                term.write(previousState);
-            } else {
-                term.writeln("");
-                term.writeln("========================================");
-                term.writeln("          SSH CONNECTION INFO          ");
-                term.writeln("----------------------------------------");
-                term.writeln(` Session Key  : ${key}`);
-                term.writeln(` Bastion Host : ${currentSession.bastionIp}`);
-                term.writeln(` Username     : ${currentSession.username}`);
-                term.writeln(` Target Host  : ${currentSession.targetIp}`);
-                term.writeln(` Time         : ${now}`);
-                term.writeln("----------------------------------------");
-                term.writeln(` Press Enter to continue`);
-                term.writeln("========================================");
-                term.writeln("");
-            }
+        console.debug(`Setup SSH called for key : ${key}`)
 
-            unlisten = await listen(eventName, (event) => {
-                term.write(event.payload as string);
-            });
 
-            const errorEventName = `ssh-error-output-${key}`;
-
-            unlistenError = await listen(errorEventName, (event) => {
-                isOpenerrorMessage = true;
-                errorMessage = event.payload as string;
-            });
-
-            let inputBuffer = "";
-            let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-            term.onData((data: string) => {
-                inputBuffer += data;
-
-                if (debounceTimer) return;
-
-                debounceTimer = setTimeout(() => {
-                    const payload = inputBuffer;
-                    inputBuffer = "";
-                    debounceTimer = null;
-
-                    invoke("send_ssh_input", {
-                        input: payload,
-                        ip: key,
-                    });
-                }, 70);
-            });
-        };
-
-        const handleResize = () => fitAddon.fit();
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.ctrlKey) {
-                if (e.key === "=" || e.key === "+") {
-                    e.preventDefault();
-                    incrementTerminalFont(term, fitAddon, 1)
-                } else if (e.key === "-") {
-                    e.preventDefault();
-                    incrementTerminalFont(term, fitAddon, -1)
-                } else if (e.key === "0") {
-                    e.preventDefault();
-                    term.options.fontSize = 13;
-                    fitAddon.fit();
-                }
-            }
-        };
-        
-        const handleScroll = (e : WheelEvent) => {
-            if(!e.ctrlKey){
-                return
-            }
-            
-            // if scroll up > resize up
-            e.preventDefault();
-            let increment = 0;
-
-            if(e.deltaY > 0){
-                increment = -1
-            }else{
-                increment = 1
-            }
-
-            incrementTerminalFont(term, fitAddon, increment)
-            // if scroll down > resize down
+        // cleanup ssh connection yang tab sebelumnya dlu
+        // klo gaada ini, connectionnya ttp persists ketika user pindah tab
+        if(cleanupSsh){
+            console.debug("Cleaning up ssh")
+            cleanupSsh()
         }
 
-        $effect(() => {
-            if (targetKey !== currentSshKey) {
-                if (targetKey && targetKey !== "unknown") {
-                    console.log("SSH Key changed or initialized:", targetKey);
+        const currentSession = await loadSessionInfo(key);
+        if (!currentSession) {
+            term.writeln(
+                `\r\n\x1b[31mError: Session info not found for key: ${key}\x1b[0m`,
+            );
+            return;
+        }
+        session = currentSession;
 
-                    // cleanup listener lama
-                    if (unlisten) unlisten();
-                    if (unlistenError) unlistenError();
+        const eventName = `ssh-output-${key}`;
 
-                    term.clear();
-                    currentSshKey = targetKey;
-                    setupSsh(targetKey);
-                } else {
-                    currentSshKey = "unknown";
-                }
-            }
+        // klo idnya uda ada history, kita load aja
+        const previousState = loadTerminalState(key);
+        if (previousState) {
+            term.write(previousState);
+        } else {
+            term.writeln("");
+            term.writeln("========================================");
+            term.writeln("          SSH CONNECTION INFO          ");
+            term.writeln("----------------------------------------");
+            term.writeln(` Session Key  : ${key}`);
+            term.writeln(` Bastion Host : ${currentSession.bastionIp}`);
+            term.writeln(` Username     : ${currentSession.username}`);
+            term.writeln(` Target Host  : ${currentSession.targetIp}`);
+            term.writeln(` Time         : ${new Date().toLocaleString()}`);
+            term.writeln("----------------------------------------");
+            term.writeln(` Press Enter to continue`);
+            term.writeln("========================================");
+            term.writeln("");
+        }
+
+        unlisten = await listen(eventName, (event) => {
+
+            // console.debug("user typed : " + event.payload)
+
+            term.write(event.payload as string);
         });
 
+        const errorEventName = `ssh-error-output-${key}`;
+
+        unlistenError = await listen(errorEventName, (event) => {
+            isOpenerrorMessage = true;
+            errorMessage = event.payload as string;
+        });
+
+        let inputBuffer = "";
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+        let detachTermOnData = term.onData((data: string) => {
+            inputBuffer += data;
+
+            if (debounceTimer) return;
+
+            debounceTimer = setTimeout(() => {
+                const payload = inputBuffer;
+                inputBuffer = "";
+                debounceTimer = null;
+
+                console.debug(`Sending string : ${payload}`)
+
+                invoke("send_ssh_input", {
+                    input: payload,
+                    ip: key,
+                });
+            }, 70);
+        });
+
+        cleanupSsh = function(){
+            console.debug(`Session : ${session?.sessionKey} : SSH cleaned up`)
+            detachTermOnData.dispose(); // xterm's IDisposable
+            if (debounceTimer) clearTimeout(debounceTimer);
+        };
+
+    }
+
+
+
+    function teardownSsh(){
+        if (
+            currentSshKey &&
+            currentSshKey !== "unknown" &&
+            serializeAddon
+        ) {
+
+            console.debug(`Teardown ssh called on ${currentSshKey}`)
+            saveTerminalState(currentSshKey, serializeAddon.serialize());
+        }
+        if (unlisten) unlisten();
+        if (unlistenError) unlistenError();
+    }
+
+    function setupWindowEventListeners(){
+        
 
         window.addEventListener("resize", handleResize);
         window.addEventListener("keydown", handleKeyDown);
         window.addEventListener("wheel", handleScroll);
+    }
 
-        return () => {
-            if (
-                currentSshKey &&
-                currentSshKey !== "unknown" &&
-                serializeAddon
-            ) {
-                saveTerminalState(currentSshKey, serializeAddon.serialize());
+    function removeWindowEventListeners(){
+        window.addEventListener("resize", handleResize);
+        window.addEventListener("keydown", handleKeyDown);
+        window.addEventListener("wheel", handleScroll);
+    }
+
+    
+    
+    // tiap targetKey berubah, ini jalan
+    // TODO : ketika user pindah tab, pastiin connectionnnya mati tp terminalnya ga diclear
+     $effect(() => {
+        console.debug(`Side effect triggered with targetKey : ${targetKey}, currentKy : ${currentSshKey}`)
+        
+        
+        // klo newKey (yg di params) beda dgn yg current, init koneksi baru
+        if (targetKey !== currentSshKey) {
+
+            if(currentSshKey && serializeAddon){
+                // apabila skrg uda buka tab, lalu mau pindah tab, kita savve dlu state skrg
+                saveTerminalState(currentSshKey, serializeAddon.serialize())
             }
-            window.removeEventListener("resize", handleResize);
-            window.removeEventListener("keydown", handleKeyDown);
-            if (unlisten) unlisten();
-            if (unlistenError) unlistenError();
-            term.dispose();
-        };
-    });
 
-    onDestroy(() => {
-        if (currentSshKey && currentSshKey !== "unknown" && serializeAddon) {
-            saveTerminalState(currentSshKey, serializeAddon.serialize());
+            if (targetKey && targetKey !== "unknown") {
+                console.debug("SSH Key changed or initialized:", targetKey);
+
+                // cleanup listener lama
+                if (unlisten) unlisten();
+                if (unlistenError) unlistenError();
+
+                term.clear();
+                currentSshKey = targetKey;
+                setupSsh(targetKey);
+            } else {
+                currentSshKey = "unknown";
+            }
         }
     });
+
+
+    // mount cuma jalan ketika first dtg ke page, klo pindah tab 1 ke tab 2 (navigasi yang pake search params), onMountnya ga jalan, yg jalan yang $effect di atas
+    onMount(() => {
+        setupTerminal()
+        setupWindowEventListeners();
+    });
+
+
+    
+    onDestroy(() => {
+        console.debug(`ID : ${session?.sessionKey}, page destroyed (OnDestroy)`)
+        teardownSsh()
+        removeWindowEventListeners();
+        term.dispose();
+    });
+
+
+
 </script>
 
 <div class="flex flex-col h-screen bg-[#1a1b26]">
