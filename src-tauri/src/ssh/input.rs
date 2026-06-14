@@ -13,7 +13,7 @@ pub fn send_ssh_input(
         instance
             .tx
             .send(format!("{}", input))
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| println!("Send SSh Input fail : {}", e.to_string()));
         Ok(())
     } else {
         Err("Session not found".into())

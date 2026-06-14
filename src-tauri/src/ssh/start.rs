@@ -5,6 +5,8 @@ use uuid::Uuid;
 use crate::ssh::ssh_instance;
 use crate::ssh::{ssh_engine::SshEngine, ssh_instance::SshInstance};
 
+
+// works untuk duplicate juga
 #[tauri::command]
 pub async fn start_ssh_session(
     window: tauri::Window,
@@ -30,7 +32,10 @@ pub async fn start_ssh_session(
         hostname_clone.clone().replace(".", "-"),
         Uuid::new_v4().to_string()
     );
-    registry.insert(session_key.clone(), SshInstance { tx, stop_tx });
+    registry.insert(session_key.clone(), SshInstance { 
+        tx : tx, 
+        stop_tx : stop_tx
+    });
     let _ = window.emit("session_updated", session_key.clone());
     let window_clone = window.clone();
     SshEngine::spawn_thread_write(rx, channel, stop_rx.clone());

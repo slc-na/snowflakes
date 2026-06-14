@@ -1,12 +1,9 @@
 use tauri::Emitter;
 
-use crate::ssh::{ssh_engine::SshEngine, ssh_instance::SshInstance};
+use crate::ssh::ssh_engine::SshEngine;
 
 #[tauri::command]
-pub async fn get_active_session(
-    window: tauri::Window,
-    state: tauri::State<'_, SshEngine>,
-) -> Result<Vec<String>, String> {
+pub async fn get_active_session(state: tauri::State<'_, SshEngine>) -> Result<Vec<String>, String> {
     let registry = state.0.lock().unwrap();
 
     let keys = registry.keys().cloned().collect::<Vec<String>>();

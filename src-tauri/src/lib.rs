@@ -2,6 +2,7 @@
 
 use crate::sftp::sftp_engine::SftpEngine;
 use crate::ssh::ssh_engine::SshEngine;
+use reqwest::Client;
 use serde::Serialize;
 use ssh::input::send_ssh_input;
 use ssh::manage_session::disconnect;
@@ -12,9 +13,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 use sysinfo::System;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_updater::UpdaterExt;
 
+mod oauth;
 mod sftp;
 mod ssh;
+mod store;
+mod config;
+mod http;
 
 #[derive(Serialize)]
 struct SystemStats {
@@ -65,6 +72,8 @@ pub fn run() {
     let ssh_state = SshEngine(Arc::new(Mutex::new(HashMap::new())));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_stronghold::Builder::new(|password| {
@@ -87,19 +96,26 @@ pub fn run() {
             .build(),
         )
         .setup(|app| {
-            // Mengambil handle untuk digunakan di dalam closure atau thread
-            let _app_handle = app.handle();
-
-            // Contoh: Jika kamu ingin melakukan sesuatu saat app baru nyala
-            // app_handle.emit_all("sys-status", "Backend Ready").unwrap();
-
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = update(handle.clone()).await {
+                    let _ = handle
+                        .dialog()
+                        .message(format!("Update Error: {}", e))
+                        .title("Updater Debug")
+                        .blocking_show();
+                }
+            });
             Ok(())
         })
         .manage(metric_state)
         .manage(ssh_state)
+        .manage(Client::new())
         .manage(SftpEngine(Arc::new(Mutex::new(HashMap::new()))))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_oauth::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             get_system_stats,
@@ -114,7 +130,51 @@ pub fn run() {
             sftp::list::sftp_list_dir,
             sftp::download::sftp_download_file,
             sftp::upload::sftp_upload_file,
+            oauth::server::start_server,
+            oauth::token::get_token,
+            oauth::token::delete_token,
+            oauth::auth::open_oauth_login,
+            oauth::auth::oauth_is_authenticated,
+            store::user::get_user_info,
+            http::server::get_server,
+            http::shell::get_shell,
+            http::shell::update_shell,
+            http::shell::insert_shell,
+            http::server::get_bastion_ip
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
+    if let Some(update) = app.updater()?.check().await? {
+        let mut downloaded = 0;
+        // 1. Show a confirmation dialog
+        let update_version = update.version.clone();
+        let yes = app
+            .dialog()
+            .message(format!(
+                "A new version ({}) is available. Would you like to install it now?",
+                update_version
+            ))
+            .title("Update Available")
+            .buttons(MessageDialogButtons::YesNo)
+            .blocking_show();
+        if yes {
+            update
+                .download_and_install(
+                    |chunk_length, content_length| {
+                        downloaded += chunk_length;
+                        // You could emit an event here to show progress in your CSS/JS UI
+                    },
+                    || {
+                        println!("download finished");
+                    },
+                )
+                .await?;
+            println!("update installed");
+            app.restart();
+        }
+    }
+    Ok(())
 }

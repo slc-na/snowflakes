@@ -48,6 +48,7 @@ export async function connectToSession(
     }
 }
 
+
 export async function reconnectToSession(
     session: SessionInfo,
     onStatus: (status: string) => void

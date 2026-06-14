@@ -2,10 +2,10 @@ const XTERM_STATE_PREFIX = "xterm_state_";
 
 export function saveTerminalState(key: string, state: string) {
     if (!key || key === "unknown") return;
-    console.log("save terminal state", key, state);
+    console.debug("save terminal state", key, state);
     try {
         sessionStorage.setItem(XTERM_STATE_PREFIX + key, state);
-        console.log(`[SessionState] Saved state for ${key}`);
+        console.debug(`[SessionState] Saved state for ${key}`);
     } catch (e) {
         console.error(`[SessionState] Failed to save state for ${key}:`, e);
     }
@@ -13,8 +13,9 @@ export function saveTerminalState(key: string, state: string) {
 
 export function loadTerminalState(key: string): string | null {
     if (!key || key === "unknown") return null;
-    // console.log("load terminal state", key);
+    console.debug("load terminal state", key);
     try {
+        console.debug(sessionStorage.getItem(XTERM_STATE_PREFIX + key));
         return sessionStorage.getItem(XTERM_STATE_PREFIX + key);
     } catch (e) {
         console.error(`[SessionState] Failed to load state for ${key}:`, e);

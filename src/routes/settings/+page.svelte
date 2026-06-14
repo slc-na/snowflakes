@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { invoke } from '@tauri-apps/api/core';
     import {
         saveDefaultAccount,
         loadDefaultAccount,
@@ -22,6 +23,9 @@
     let sshTemplate = $state(DEFAULT_SETTINGS.sshTemplate);
     let apiKey = $state("");
     let backendUrl = $state("");
+    let fontSize = $state(13);
+
+    let fontSizeOptions = $state(Array(40).keys().map(size => size + 6))
 
     let accountUsername = $state("");
     let accountPassword = $state("");
@@ -51,12 +55,60 @@
             sshTemplate = settings.sshTemplate;
             apiKey = settings.apiKey;
             backendUrl = settings.backendUrl;
-
+            fontSize = settings.fontSize;
+            
+            
             const account = await loadDefaultAccount();
             accountUsername = account.username;
             accountPassword = account.password;
+         
+            // getting username based on oauth
+            if(!accountUsername){
+                const oauthUser: any = await invoke("get_user_info");
+                if (oauthUser && oauthUser.username) {
+                    accountUsername = oauthUser.username + "@ad.slc.net";
+                }
+
+                const account: DefaultAccount = {
+                    username: accountUsername,
+                    password: accountPassword,
+                };
+                await saveDefaultAccount(account);
+            }
+
+            // get bastion IP from backend if not set 
+            if(!bastionIp){
+                try {
+                    const bastionIpResult: any = await invoke("get_bastion_ip");
+                    if (bastionIpResult) {
+                        bastionIp = bastionIpResult;
+
+                        // Save the fetched bastion IP to settings
+                        const settings: SnowflakesSettings = {
+                            bastionIp,
+                            sshTemplate,
+                            apiKey,
+                            backendUrl,
+                            fontSize
+                        };
+                        await saveSettings(settings);
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch backend config:", err);
+                }
+            }
+
+
+            if(!accountUsername.endsWith("@ad.slc.net")){
+                const account: DefaultAccount = {
+                    username: accountUsername + "@ad.slc.net",
+                    password: accountPassword,
+                };
+                await saveDefaultAccount(account);
+            }
 
             sessions = await loadAllSessions();
+
         } catch (err) {
             console.error("[Settings] load error:", err);
         }
@@ -69,6 +121,7 @@
                 sshTemplate,
                 apiKey,
                 backendUrl,
+                fontSize,
             };
             saveSettings(settings);
 
@@ -288,6 +341,25 @@
             {/if}
         </section>
 
+
+        <!-- font size selection -->
+        <section class="section">
+            <h2 class="section-title">Preferred Font Size</h2>
+            <div class="section-body">
+                <div class="field">
+                    <label for="acct-username">Font Size</label>
+
+                    <select bind:value={fontSize}>
+                        {#each fontSizeOptions as num}
+                            <option value={num}>
+                                {num}px
+                            </option>
+                        {/each}
+                    </select>
+                </div>
+            </div>
+        </section>
+
         <!-- Save -->
         <div class="save-bar">
             {#if statusMessage}
@@ -416,6 +488,31 @@
 
     input::placeholder {
         color: var(--sf-text-hint);
+    }
+
+    select {
+        background: var(--sf-bg-input);
+        border: 1px solid var(--sf-border);
+        border-radius: 7px;
+        padding: 8px 10px;
+        font-size: 12px;
+        color: var(--sf-text-primary);
+        outline: none;
+        width: 100%;
+        font-family: var(--sf-font-ui);
+        box-sizing: border-box;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 28px;
+    }
+
+    select:focus {
+        border-color: var(--sf-accent);
     }
 
     .field-hint {

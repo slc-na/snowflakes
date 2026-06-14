@@ -87,3 +87,40 @@
   --sf-tabbar-height:   38px;
 }
 
+[data-theme="light"] {
+  --sf-bg-app:          #F3F6F9;  /* light gray-blue — main app bg */
+  --sf-bg-surface:      #FFFFFF;  /* cards, panels */
+  --sf-bg-terminal:     #050F1C;  /* terminal area usually stays dark, but let's keep it legible or dark */
+  --sf-bg-sidebar:      #FFFFFF;  /* sidebar bg */
+  --sf-bg-sidebar-active: #E8F0F8;  /* active nav item */
+  --sf-bg-input:        #F3F6F9;  /* form inputs */
+  --sf-bg-hover:        #E8F0F8;  /* generic hover state */
+  --sf-bg-tab-bar:      #F3F6F9;  /* tab bar strip */
+  --sf-bg-modal:        #FFFFFF;  /* modal dialog */
+  --sf-bg-overlay:      rgba(15, 34, 54, 0.4);  /* modal backdrop */
+  
+  --sf-bg-card:         #FFFFFF;
+
+  --sf-text-primary:    #0B1929;  /* main readable text */
+  --sf-text-secondary:  #4B6B8A;  /* labels, nav items */
+  --sf-text-hint:       #7AA8CC;  /* placeholders, timestamps */
+  --sf-text-accent:     #0288D1;  /* links, terminal text, pills */
+  --sf-text-on-accent:  #FFFFFF;  /* text on glacier-blue buttons */
+  --sf-text-muted:      #7AA8CC;  /* muted text */
+  --sf-text-dim:        #A5C0D9;
+
+  --sf-accent:          #0288D1;  /* darker accent for light mode contrast */
+  --sf-accent-hover:    #0277BD;  /* button hover */
+  --sf-accent-dim:      #E1F5FE;  /* dimmed accent / focus ring */
+  --sf-accent-glow:     rgba(2, 136, 209, 0.25);
+  
+  --sf-row-hover:       rgba(2, 136, 209, 0.08);
+
+  --sf-border:          #D4E3F0;  /* default border */
+  --sf-border-soft:     #E8F0F8;
+  --sf-border-hover:    #90CAF9;  /* card hover border */
+  --sf-border-accent:   #0288D1;  /* active tab / nav highlight */
+  --sf-border-focus:    #0288D1;  /* input focus ring */
+}
+
+

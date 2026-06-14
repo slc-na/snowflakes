@@ -5,11 +5,13 @@
     ShieldCheck,
     ArrowLeftRight,
     Settings,
+    Clock,
   } from "@lucide/svelte";
   import SidebarElement from "./SidebarElement.svelte";
 
   const menus = [
     { icon: House, text: "HOME", href: "/", isActive: true },
+    { icon: Clock, text: "RECENTS", href: "/recents", isActive: false },
     { icon: Folders, text: "FILES", href: "/files", isActive: false },
     { icon: ShieldCheck, text: "KNOWN HOSTS", href: "/hosts", isActive: false },
     {

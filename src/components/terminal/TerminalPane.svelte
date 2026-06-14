@@ -14,6 +14,7 @@
         saveTerminalState,
         loadTerminalState,
     } from "../../controller/session";
+    import { incrementTerminalFont } from "$lib/resizeTerminal";
 
     let { targetKey, onClose } = $props<{
         targetKey: string;
@@ -137,31 +138,26 @@
         };
 
         const customKeyHandler = (e: KeyboardEvent) => {
+
+            let increment = 0;
+
             if (e.type === 'keydown' && e.ctrlKey && term && fitAddon) {
                 if (e.key === "=" || e.key === "+") {
                     e.preventDefault();
-                    if (term.options.fontSize && term.options.fontSize < 40) {
-                        term.options.fontSize += 1;
-                        fitAddon.fit();
-                    }
-                    return false;
+                    increment = 1;
                 } else if (e.key === "-") {
                     e.preventDefault();
-                    if (term.options.fontSize && term.options.fontSize > 6) {
-                        term.options.fontSize -= 1;
-                        fitAddon.fit();
-                    }
-                    return false;
-                } else if (e.key === "0") {
-                    e.preventDefault();
-                    term.options.fontSize = 13;
-                    fitAddon.fit();
-                    return false;
+                    increment = -1;
                 }
+
+                incrementTerminalFont(term, fitAddon, increment)
+                return false
             }
             return true;
         };
         term.attachCustomKeyEventHandler(customKeyHandler);
+
+        // TODO : tambahin control + scroll
 
         $effect(() => {
             if (targetKey !== currentSshKey) {

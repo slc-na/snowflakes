@@ -7,15 +7,20 @@
 		ArrowLeftRight,
 		Settings,
 		LayoutGrid,
+		Clock,
+		Sun,
+		Moon
 	} from "@lucide/svelte";
 	import SidebarElement from "../components/home/SidebarElement.svelte";
 	import "../layout.css";
 	import TitleBar from "../components/TitleBar.svelte";
 	import SessionTabBar from "../components/terminal/SessionTabBar.svelte";
 	import { Toaster } from 'svelte-sonner';
+	import { onMount } from "svelte";
 
 	const menus = [
 		{ icon: House, text: "HOME", href: "/" },
+		{ icon: Clock, text: "RECENTS", href: "/recents" },
 		{ icon: Folders, text: "FILES", href: "/files" },
 		{ icon: ShieldCheck, text: "KNOWN HOSTS", href: "/hosts" },
 		{ icon: ArrowLeftRight, text: "PORT FORWARDING", href: "/ports" },
@@ -23,11 +28,35 @@
 		{ icon: Settings, text: "SETTINGS", href: "/settings" },
 	];
 
-	let showTabBar = menus.some(
+	let theme = $state("dark");
+
+	onMount(() => {
+		const stored = localStorage.getItem("sf-theme");
+		if (stored === "light") {
+			theme = "light";
+			document.documentElement.setAttribute("data-theme", "light");
+		}
+	});
+
+	function toggleTheme() {
+		if (theme === "dark") {
+			theme = "light";
+			document.documentElement.setAttribute("data-theme", "light");
+			localStorage.setItem("sf-theme", "light");
+		} else {
+			theme = "dark";
+			document.documentElement.removeAttribute("data-theme");
+			localStorage.setItem("sf-theme", "dark");
+		}
+	}
+
+	let showTabBar = $derived(menus.some(
 		(menu) =>
 			menu.href === $page.url.pathname ||
 			$page.url.pathname.includes("/session"),
-	);
+	));
+	
+	let isLoginPage = $derived($page.url.pathname === '/login');
 </script>
 
 <TitleBar />
@@ -44,32 +73,42 @@
 	}}
 />
 
-<div class="app-parent">
-	<aside class="sidebar-container">
-		<div class="brand-section">
-			<h1 class="brand-title">SNOWFLAKES</h1>
-			<p class="brand-subtitle">SSH MANAGER</p>
+	<div class="app-parent">
+		<aside class="sidebar-container">
+			<div class="brand-section">
+				<h1 class="brand-title">SNOWFLAKES</h1>
+				<p class="brand-subtitle">SSH MANAGER</p>
+			</div>
+
+			<nav class="nav-menu">
+				{#each menus as menu}
+					<SidebarElement
+						text={menu.text}
+						icon={menu.icon}
+						href={menu.href}
+						isActive={$page.url.pathname === menu.href}
+					/>
+				{/each}
+			</nav>
+			
+			<div class="sidebar-spacer"></div>
+
+			<button class="theme-toggle" onclick={toggleTheme}>
+				{#if theme === 'dark'}
+				  <Sun size={16} /> <span class="toggle-text">LIGHT MODE</span>
+				{:else}
+				  <Moon size={16} /> <span class="toggle-text">DARK MODE</span>
+				{/if}
+			</button>
+		</aside>
+
+		<div class="app-layout">
+			{#if showTabBar}
+				<SessionTabBar />
+			{/if}
+			<slot />
 		</div>
-
-		<nav class="nav-menu">
-			{#each menus as menu}
-				<SidebarElement
-					text={menu.text}
-					icon={menu.icon}
-					href={menu.href}
-					isActive={$page.url.pathname === menu.href}
-				/>
-			{/each}
-		</nav>
-	</aside>
-
-	<div class="app-layout">
-		{#if showTabBar}
-			<SessionTabBar />
-		{/if}
-		<slot />
 	</div>
-</div>
 
 <style>
 	.app-parent {
@@ -131,5 +170,35 @@
 		flex-direction: column;
 		gap: 4px;
 		padding: 0 8px;
+	}
+
+	.sidebar-spacer {
+		flex: 1;
+	}
+
+	.theme-toggle {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin: 16px 8px;
+		padding: 10px 14px;
+		background: transparent;
+		border: none;
+		border-radius: var(--sf-radius-md);
+		color: var(--sf-text-secondary);
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.theme-toggle:hover {
+		background: var(--sf-bg-hover);
+		color: var(--sf-text-primary);
+	}
+
+	.toggle-text {
+		font-family: var(--sf-font-ui);
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 1px;
 	}
 </style>

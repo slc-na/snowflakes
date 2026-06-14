@@ -1,14 +1,19 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import NewHostModal from "../components/modal/NewHostModal.svelte";
-  import type { SessionInfo } from "../types/settings";
-  import { getAllServers } from "../controller/local";
-  import { invoke } from '@tauri-apps/api/core';
-  import type { ServerAttribute } from "../types/servers";
+  import NewHostModal from "../../components/modal/NewHostModal.svelte";
+  import { deleteSessionPass } from "../../controller/vault";
+  import {
+    connectToSession,
+    deleteSession,
+    reconnectToSession,
+  } from "../../controller/ssh";
+  import type { SessionInfo } from "../../types/settings";
+  import { deleteSessionInfo, loadAllSessions } from "../../controller/local";
+  import { clearTerminalState } from "../../controller/session";
 
   let isModalOpen = $state(false);
-  let servers = $state<ServerAttribute[]>([]);
+  let sessions = $state<SessionInfo[]>([]);
   let prefillSession = $state<SessionInfo | null>(null);
   let isLoading = $state(true);
 
@@ -16,71 +21,53 @@
   let connectingStatus = $state("");
   let errorMsg = $state("");
 
-  let searchQuery = $state("");
-  let sortKey = $state<"name" | "ip">("name");
-  let sortDir = $state<"asc" | "desc">("asc");
-  let filterOnline = $state(false); 
-
-  let filteredServers = $derived(() => {
-    let list = [...servers];
-    console.log(list);
-
-    const q = searchQuery.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.ip.toLowerCase().includes(q) ||
-          s.description.toLowerCase().includes(q),
-      );
-    }
-
-    list.sort((a, b) => {
-      const av = sortKey === "ip" ? a.ip : a.name.toLowerCase();
-      const bv = sortKey === "ip" ? b.ip : b.name.toLowerCase();
-      if (av < bv) return sortDir === "asc" ? -1 : 1;
-      if (av > bv) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    return list;
-  });
-
   onMount(async () => {
     try {
-      servers = await getAllServers();
+      sessions = await loadAllSessions();
     } catch (err) {
-      console.error("[Home] Failed to load servers:", err);
+      console.error("[Recents] Failed to load sessions:", err);
     } finally {
       isLoading = false;
     }
   });
 
+  async function handleCardClick(session: SessionInfo) {
+    errorMsg = "";
+    isConnecting = true;
+    try {
+      const key = await reconnectToSession(session, (msg) => {
+        connectingStatus = msg;
+      });
+      goto(`/session?key=${key}`, {
+        state: {
+          bastion: session.bastionIp,
+          initialUsername: session.username,
+          hostname: session.targetIp,
+        },
+      });
+    } catch (e) {
+      errorMsg = String(e);
+      isConnecting = false;
+    }
+  }
+
+  async function handleDeleteClick(e: MouseEvent, sessionKey: string) {
+    e.stopPropagation();
+    if (confirm("Are you sure you want to delete this host?")) {
+      try {
+        await deleteSessionInfo(sessionKey);
+        await deleteSessionPass(sessionKey);
+        clearTerminalState(sessionKey);
+        sessions = sessions.filter((s) => s.sessionKey !== sessionKey);
+      } catch (err) {
+        console.error("[Recents] Failed to delete session:", err);
+      }
+    }
+  }
+
   function handleNewHost() {
     prefillSession = null;
     isModalOpen = true;
-  }
-
-  function handleServerCardClick(server: ServerAttribute) {
-    prefillSession = {
-      sessionKey: "",          
-      targetIp: server.ip,
-      label: server.name,
-      username: "",
-      password: "",
-      bastionIp: "",
-      connectedAt: 0,
-    };
-    isModalOpen = true;
-  }
-
-  function toggleSort(key: "name" | "ip") {
-    if (sortKey === key) {
-      sortDir = sortDir === "asc" ? "desc" : "asc";
-    } else {
-      sortKey = key;
-      sortDir = "asc";
-    }
   }
 
   function formatDate(ts: number): string {
@@ -92,84 +79,30 @@
   <div class="main-container">
     <div class="page-content">
 
-      <!-- ══════════════════════ SERVERS SECTION ══════════════════════ -->
+      <!-- ═══════════════════ RECENT SESSIONS SECTION ═════════════════ -->
       <section class="section">
         <div class="section-header">
           <div class="section-title-group">
             <span class="section-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
               </svg>
             </span>
-            <h2 class="section-title">Servers</h2>
-            <span class="section-count">{filteredServers().length}</span>
+            <h2 class="section-title">Recent Sessions</h2>
+            <span class="section-count">{sessions.length}</span>
           </div>
 
-          <!-- Toolbar: Search + Sort -->
-          <div class="toolbar">
-            <div class="search-wrap">
-              <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-              </svg>
-              <input
-                id="server-search"
-                class="search-input"
-                type="text"
-                placeholder="Search servers…"
-                bind:value={searchQuery}
-              />
-              {#if searchQuery}
-                <button class="search-clear" onclick={() => (searchQuery = "")}>✕</button>
-              {/if}
-            </div>
-
-            <div class="sort-group">
-              <span class="sort-label">Sort</span>
-              <button
-                id="sort-by-name"
-                class="sort-btn"
-                class:active={sortKey === "name"}
-                onclick={() => toggleSort("name")}
-              >
-                Name
-                {#if sortKey === "name"}
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                    {#if sortDir === "asc"}
-                      <path d="M12 19V5M5 12l7-7 7 7"/>
-                    {:else}
-                      <path d="M12 5v14M5 12l7 7 7-7"/>
-                    {/if}
-                  </svg>
-                {/if}
-              </button>
-              <button
-                id="sort-by-ip"
-                class="sort-btn"
-                class:active={sortKey === "ip"}
-                onclick={() => toggleSort("ip")}
-              >
-                IP
-                {#if sortKey === "ip"}
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                    {#if sortDir === "asc"}
-                      <path d="M12 19V5M5 12l7-7 7 7"/>
-                    {:else}
-                      <path d="M12 5v14M5 12l7 7 7-7"/>
-                    {/if}
-                  </svg>
-                {/if}
-              </button>
-            </div>
-          </div>
+          <button class="btn-new-host" id="new-host-btn" onclick={handleNewHost}>
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10 4v12M4 10h12"/>
+            </svg>
+            New Host
+          </button>
         </div>
 
-        <!-- Server Grid -->
         {#if isLoading}
           <div class="grid">
-            {#each Array(4) as _}
+            {#each Array(3) as _}
               <div class="card skeleton-card">
                 <div class="skeleton-top shimmer"></div>
                 <div class="skeleton-mid shimmer"></div>
@@ -178,65 +111,62 @@
               </div>
             {/each}
           </div>
-        {:else if filteredServers().length === 0}
+        {:else if sessions.length === 0}
           <div class="empty-state">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.3">
-              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-              <line x1="6" y1="6" x2="6.01" y2="6"></line>
-              <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+              <polyline points="13 2 13 9 20 9"></polyline>
             </svg>
-            <span class="empty-title">
-              {searchQuery ? "No servers match your search" : "No servers found"}
-            </span>
-            <span class="empty-sub">
-              {searchQuery ? "Try a different keyword or clear the filter" : "Servers will appear here once loaded"}
-            </span>
+            <span class="empty-title">No recent sessions</span>
+            <span class="empty-sub">Click <strong>New Host</strong></span>
           </div>
         {:else}
           <div class="grid">
-            {#each filteredServers() as server (server.id)}
-              <button
-                class="card server-card"
-                id="server-{server.id}"
-                onclick={() => handleServerCardClick(server)}
+            {#each sessions as session (session.sessionKey)}
+              <div
+                class="card group"
+                onclick={() => handleCardClick(session)}
+                role="button"
+                tabindex="0"
+                onkeydown={(e) => e.key === "Enter" && handleCardClick(session)}
               >
                 <div class="card-top">
                   <div class="card-title-row">
-                    <div class="server-badge">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <rect x="2" y="2" width="20" height="8" rx="2"></rect>
-                        <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                      </svg>
-                    </div>
-                    <h3 class="hostname">{server.name}</h3>
+                    <div class="status-dot online"></div>
+                    <h3 class="hostname">{session.targetIp}</h3>
                   </div>
-                  <span class="connect-hint">
-                    Connect
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                  <button
+                    class="delete-btn"
+                    onclick={(e) => handleDeleteClick(e, session.sessionKey)}
+                    title="Delete connection"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
-                  </span>
+                  </button>
                 </div>
 
                 <div class="card-meta">
-                  <code class="user-ip">{server.ip}</code>
-                  {#if server.description}
-                    <span class="label-text">{server.description}</span>
-                  {/if}
+                  <code class="user-ip">{session.username}@{session.targetIp}</code>
+                  <span class="label-text">{session.label}</span>
                 </div>
 
                 <div class="card-footer">
-                  <span class="ip-badge">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                      <circle cx="12" cy="10" r="3"></circle>
+                  <div class="last-seen">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
                     </svg>
-                    {server.ip}
-                  </span>
-                  <span class="click-hint">Click to connect</span>
+                    {formatDate(session.connectedAt)}
+                  </div>
+                  <span class="connect-hint">
+                    Direct Connect
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                  </span> 
                 </div>
-              </button>
+              </div>
             {/each}
           </div>
         {/if}
@@ -332,108 +262,6 @@
     letter-spacing: 0.05em;
   }
 
-  /* ── Toolbar ──────────────────────────────────────────────── */
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .search-wrap {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-
-  .search-icon {
-    position: absolute;
-    left: 9px;
-    color: var(--sf-text-hint);
-    pointer-events: none;
-  }
-
-  .search-input {
-    background: var(--sf-bg-surface);
-    border: 1px solid var(--sf-border);
-    border-radius: var(--sf-radius-md);
-    padding: 6px 28px 6px 28px;
-    font-size: 12px;
-    color: var(--sf-text-primary);
-    outline: none;
-    width: 220px;
-    font-family: var(--sf-font-ui);
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-
-  .search-input:focus {
-    border-color: var(--sf-accent);
-    box-shadow: 0 0 0 2px var(--sf-accent-glow);
-  }
-
-  .search-input::placeholder {
-    color: var(--sf-text-hint);
-  }
-
-  .search-clear {
-    position: absolute;
-    right: 8px;
-    background: none;
-    border: none;
-    color: var(--sf-text-hint);
-    cursor: pointer;
-    font-size: 10px;
-    padding: 2px;
-    line-height: 1;
-    transition: color 0.15s;
-  }
-
-  .search-clear:hover {
-    color: var(--sf-text-primary);
-  }
-
-  .sort-group {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .sort-label {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--sf-text-hint);
-    margin-right: 2px;
-  }
-
-  .sort-btn {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background: var(--sf-bg-surface);
-    border: 1px solid var(--sf-border);
-    border-radius: var(--sf-radius-sm);
-    padding: 5px 10px;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--sf-text-secondary);
-    cursor: pointer;
-    transition: all 0.15s;
-    font-family: var(--sf-font-ui);
-  }
-
-  .sort-btn:hover {
-    border-color: var(--sf-border-hover);
-    color: var(--sf-text-primary);
-  }
-
-  .sort-btn.active {
-    border-color: var(--sf-accent);
-    color: var(--sf-accent);
-    background: var(--sf-accent-dim);
-  }
-
   /* ── New Host Button ──────────────────────────────────────── */
   .btn-new-host {
     display: flex;
@@ -482,55 +310,6 @@
     border-left-color: var(--sf-accent);
     background: var(--sf-bg-hover);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-  }
-
-  /* ── Server Card ──────────────────────────────────────────── */
-  .server-card {
-    border-left: 2px solid transparent;
-  }
-
-  .server-card:hover .connect-hint {
-    opacity: 1;
-  }
-
-  .server-badge {
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    background: var(--sf-accent-dim);
-    border: 1px solid rgba(79, 195, 247, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--sf-accent);
-    flex-shrink: 0;
-    transition: background 0.15s;
-  }
-
-  .server-card:hover .server-badge {
-    background: rgba(79, 195, 247, 0.2);
-  }
-
-  .ip-badge {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-family: var(--sf-font-mono);
-    font-size: 10px;
-    color: var(--sf-text-hint);
-    letter-spacing: 0.02em;
-  }
-
-  .click-hint {
-    font-size: 10px;
-    color: var(--sf-text-hint);
-    opacity: 0;
-    transition: opacity 0.15s;
-    letter-spacing: 0.03em;
-  }
-
-  .server-card:hover .click-hint {
-    opacity: 1;
   }
 
   /* ── Card internals ───────────────────────────────────────── */
