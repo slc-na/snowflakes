@@ -61,6 +61,34 @@
                 fitAddon.fit();
             }
         }
+
+
+        // handle ctrl + alt +  c = copy
+        if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'c') {
+            if (e.type === 'keydown') {
+                const selection = term.getSelection();
+                if (selection) {
+                    navigator.clipboard.writeText(selection);
+                }
+            }
+            e.preventDefault();
+            return false; // stop xterm from processing this further
+        }
+
+        // Ctrl+Alt+V — Paste
+        if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'v') {
+            if (e.type === 'keydown') {
+                navigator.clipboard.readText().then((text) => {
+                    term.paste(text);
+                }).catch((err) => {
+                    console.error("Clipboard read failed:", err);
+                });
+            }
+            e.preventDefault();
+            return false;
+        }
+
+        return true; // let xterm handle everything else normally
     };
 
 
@@ -181,7 +209,7 @@
 
 
 
-        // 
+    
         let detachTermOnData = term.onData((data: string) => {
             inputBuffer += data;
 
@@ -201,17 +229,23 @@
             }, 70);
         });
 
-        let detachTermOnSelection =  term.onSelectionChange(() => {
-            const selection = term.getSelection();
-            if (selection) {
-                navigator.clipboard.writeText(selection);
-            }
-        })
+
+        // TODO : pick antara mau by selection atau by ctrl + alt + c
+        // let detachTermOnSelection =  term.onSelectionChange(() => {
+        //     const selection = term.getSelection();
+        //     if (selection) {
+        //         navigator.clipboard.writeText(selection);
+        //     }
+        // })
+
+
+
+        term.attachCustomKeyEventHandler(handleKeyDown);
 
         cleanupSsh = function(){
             console.debug(`Session : ${session?.sessionKey} : SSH cleaned up`)
             detachTermOnData.dispose(); //lepasin onData
-            detachTermOnSelection.dispose() //lepasin onSelect
+            // detachTermOnSelection.dispose() //lepasin onSelect
             if (debounceTimer) clearTimeout(debounceTimer);
         };
 
@@ -237,13 +271,11 @@
         
 
         window.addEventListener("resize", handleResize);
-        window.addEventListener("keydown", handleKeyDown);
         window.addEventListener("wheel", handleScroll);
     }
 
     function removeWindowEventListeners(){
         window.addEventListener("resize", handleResize);
-        window.addEventListener("keydown", handleKeyDown);
         window.addEventListener("wheel", handleScroll);
     }
 
