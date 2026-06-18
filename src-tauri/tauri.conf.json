@@ -45,9 +45,9 @@
           "installMode": "basicUi"
         },
 
-        "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ0QzhGQTczNTg1QUI3MUQKUldRZHQxcFljL3JJUkgxNnpyQzB6czZRNW4vNU1QRGlDK3ZJajlPYUJvckdscTNKSXE0ZlVtb1gK",
+        "pubkey": "$TAURI_SIGNING_PUBLIC_KEY",
         "endpoints": [
-          "https://github.com/slc-na/snowflakes/releases/download/untagged-85d45918ef7faab9b6da/latest.json"
+          "$TAURI_UPDATER_ENDPOINT"
         ]
       }
     }
