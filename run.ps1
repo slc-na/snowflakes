@@ -1,0 +1,4 @@
+$env:TAURI_SIGNING_PUBLIC_KEY = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ0QzhGQTczNTg1QUI3MUQKUldRZHQxcFljL3JJUkgxNnpyQzB6czZRNW4vNU1QRGlDK3ZJajlPYUJvckdscTNKSXE0ZlVtb1gK"
+$env:TAURI_UPDATER_ENDPOINT = "http://localhost:8080/version/latest"
+
+npm run tauri dev
