@@ -98,7 +98,14 @@ jobs:
           echo "OAUTH_URL=${{ vars.OAUTH_URL }}" >> .env
           echo "BACKEND_URL=${{ vars.BACKEND_URL }}" >> .env
           echo "BASTION_IP=${{ vars.BASTION_IP }}" >> .env
-
+      
+      - name: Set Tauri public key
+        shell: bash
+        run: |
+          echo "TAURI_SIGNING_PUBLIC_KEY<<EOF" >> $GITHUB_ENV
+          echo "${{ vars.TAURI_SIGNING_PUBLIC_KEY }}" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+  
       - uses: tauri-apps/tauri-action@action-v0.6.1
 
         env:
@@ -106,7 +113,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_UPDATER_ENDPOINT: ${{ vars.TAURI_UPDATER_ENDPOINT }}
-          TAURI_SIGNING_PUBLIC_KEY: ${{ vars.TAURI_SIGNING_PUBLIC_KEY }}
+          TAURI_SIGNING_PUBLIC_KEY: ${{ env.TAURI_SIGNING_PUBLIC_KEY }}
           
         with:
           tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
