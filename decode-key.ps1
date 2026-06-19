@@ -1,2 +1,0 @@
-# ini buat decode keynya, nanti paste output ini ke dlm github variable
-[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ0QzhGQTczNTg1QUI3MUQKUldRZHQxcFljL3JJUkgxNnpyQzB6czZRNW4vNU1QRGlDK3ZJajlPYUJvckdscTNKSXE0ZlVtb1gK"))
