@@ -28,6 +28,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Debug signing key
+        run: |
+          echo "Key length: ${#TAURI_SIGNING_PUBLIC_KEY}"
+          echo "Key starts with: ${TAURI_SIGNING_PUBLIC_KEY:0:10}"
+        env:
+          TAURI_SIGNING_PUBLIC_KEY: ${{ vars.TAURI_SIGNING_PUBLIC_KEY }}
+
       - name: print variables
         shell: bash
         run: |
