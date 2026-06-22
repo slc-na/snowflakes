@@ -1,8 +1,11 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { invoke } from "@tauri-apps/api/core";
     import TerminalPane from "../../components/terminal/TerminalPane.svelte";
-    import { loadAllSessions } from "../../controller/local";
+    import { loadSessionInfo } from "../../controller/local";
     import type { SessionInfo } from "../../types/settings";
+
+    const WINDOW_STATE_KEY = "snowflakes_window_state";
 
     let sessions = $state<SessionInfo[]>([]);
     let layout = $state("2x2");
@@ -14,8 +17,53 @@
             .map((_, i) => ({ id: i, sessionKey: null })),
     );
 
+    let isRestoring = true;
+
+    function loadSavedWindowState(): { layout: string; paneKeys: (string | null)[] } | null {
+        const raw = localStorage.getItem(WINDOW_STATE_KEY);
+        if (!raw) return null;
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    }
+
+    function saveWindowState() {
+        if (isRestoring) return;
+        localStorage.setItem(
+            WINDOW_STATE_KEY,
+            JSON.stringify({
+                layout,
+                paneKeys: panes.map((p) => p.sessionKey),
+            }),
+        );
+    }
+
+    async function loadActiveSessions() {
+        const keys = await invoke<string[]>("get_active_session");
+        const infos = await Promise.all(keys.map((key) => loadSessionInfo(key)));
+        sessions = infos.filter((s): s is SessionInfo => s !== null);
+        return new Set(keys);
+    }
+
     onMount(async () => {
-        sessions = await loadAllSessions();
+        const activeKeys = await loadActiveSessions();
+
+        // Restore the previous layout + pane assignments, but only reattach
+        // panes to sessions that are still actually connected on the backend -
+        // a closed/dead session shouldn't reappear as a ghost pane.
+        const saved = loadSavedWindowState();
+        if (saved) {
+            if (saved.layout) layout = saved.layout;
+            saved.paneKeys.forEach((key, i) => {
+                if (panes[i] && key && activeKeys.has(key)) {
+                    panes[i].sessionKey = key;
+                }
+            });
+        }
+
+        isRestoring = false;
     });
 
     const layouts = [
@@ -36,10 +84,17 @@
     function assignSession(paneId: number, e: Event) {
         const select = e.target as HTMLSelectElement;
         panes[paneId].sessionKey = select.value === "" ? null : select.value;
+        saveWindowState();
     }
 
     function clearSession(paneId: number) {
         panes[paneId].sessionKey = null;
+        saveWindowState();
+    }
+
+    function selectLayout(id: string) {
+        layout = id;
+        saveWindowState();
     }
 </script>
 
@@ -51,7 +106,7 @@
             {#each layouts as l}
                 <button
                     class="layout-btn {layout === l.id ? 'active' : ''}"
-                    onclick={() => (layout = l.id)}
+                    onclick={() => selectLayout(l.id)}
                     title={l.label}
                 >
                     {l.label}

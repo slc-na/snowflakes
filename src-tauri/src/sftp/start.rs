@@ -1,3 +1,4 @@
+use tauri::Emitter;
 use tokio::sync::watch;
 use uuid::Uuid;
 
@@ -8,6 +9,7 @@ use crate::sftp::{
 
 #[tauri::command]
 pub async fn start_sftp_session(
+    window: tauri::Window,
     state: tauri::State<'_, SftpEngine>,
     hostname: String,
     initial_password: String,
@@ -26,6 +28,9 @@ pub async fn start_sftp_session(
 
     let mut registry = state.0.lock().unwrap();
     registry.insert(session_key.clone(), SftpInstance { sftp, stop_tx });
+    drop(registry);
+
+    let _ = window.emit("sftp_session_updated", session_key.clone());
 
     Ok(session_key)
 }

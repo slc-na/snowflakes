@@ -4,25 +4,19 @@
     import {
         saveDefaultAccount,
         loadDefaultAccount,
-        deleteSessionPass,
     } from "../../controller/vault";
     import type {
         SnowflakesSettings,
         DefaultAccount,
-        SessionInfo,
     } from "../../types/settings";
     import { DEFAULT_SETTINGS } from "../../types/settings";
     import {
-        deleteSessionInfo,
-        loadAllSessions,
         loadSettings,
         saveSettings,
     } from "../../controller/local";
 
     let bastionIp = $state("");
     let sshTemplate = $state(DEFAULT_SETTINGS.sshTemplate);
-    let apiKey = $state("");
-    let backendUrl = $state("");
     let fontSize = $state(13);
 
     let fontSizeOptions = $state(Array(40).keys().map(size => size + 6))
@@ -30,9 +24,6 @@
     let accountUsername = $state("");
     let accountPassword = $state("");
     let showAccountPassword = $state(false);
-
-    let sessions = $state<SessionInfo[]>([]);
-    let hostsOpen = $state(false);
 
     let statusMessage = $state("");
 
@@ -53,8 +44,6 @@
             const settings = await loadSettings();
             bastionIp = settings.bastionIp;
             sshTemplate = settings.sshTemplate;
-            apiKey = settings.apiKey;
-            backendUrl = settings.backendUrl;
             fontSize = settings.fontSize;
             
             
@@ -87,8 +76,6 @@
                         const settings: SnowflakesSettings = {
                             bastionIp,
                             sshTemplate,
-                            apiKey,
-                            backendUrl,
                             fontSize
                         };
                         await saveSettings(settings);
@@ -107,8 +94,6 @@
                 await saveDefaultAccount(account);
             }
 
-            sessions = await loadAllSessions();
-
         } catch (err) {
             console.error("[Settings] load error:", err);
         }
@@ -119,8 +104,6 @@
             const settings: SnowflakesSettings = {
                 bastionIp,
                 sshTemplate,
-                apiKey,
-                backendUrl,
                 fontSize,
             };
             saveSettings(settings);
@@ -136,21 +119,6 @@
             console.error("[Settings] save error:", err);
             showStatus("Failed to save settings");
         }
-    }
-
-    async function handleDeleteSession(key: string) {
-        try {
-            await deleteSessionInfo(key);
-            await deleteSessionPass(key);
-            sessions = sessions.filter((s) => s.sessionKey !== key);
-            showStatus("Host removed");
-        } catch (err) {
-            console.error("[Settings] delete session error:", err);
-        }
-    }
-
-    function formatDate(ts: number): string {
-        return new Date(ts).toLocaleString();
     }
 </script>
 
@@ -202,34 +170,6 @@
         </div>
 
         <div class="settings-column">
-            <!-- API Configuration -->
-            <section class="section">
-                <h2 class="section-title">API Configuration</h2>
-                <div class="section-body">
-                    <div class="field">
-                        <label for="api-key">SNOWFLAKES_API_KEY</label>
-                        <input
-                            id="api-key"
-                            type="password"
-                            placeholder="Enter API key"
-                            bind:value={apiKey}
-                        />
-                    </div>
-
-                    <div class="field">
-                        <label for="backend-url">SNOWFLAKES_BACKEND_URL</label>
-                        <input
-                            id="backend-url"
-                            type="text"
-                            placeholder="https://api.snowflakes.example.com"
-                            bind:value={backendUrl}
-                        />
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <div class="settings-column">
             <!-- Default Account -->
             <section class="section">
                 <h2 class="section-title">Default Account</h2>
@@ -269,79 +209,6 @@
     </div>
 
     <div class="settings-footer">
-        <!-- Known Hosts Accordion -->
-        <section class="section">
-            <button
-                class="accordion-toggle"
-                onclick={() => (hostsOpen = !hostsOpen)}
-                aria-expanded={hostsOpen}
-            >
-                <h2 class="section-title" style="margin:0">
-                    Known Hosts ({sessions.length})
-                </h2>
-                <span class="accordion-arrow" class:open={hostsOpen}>
-                    <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                    >
-                        <polyline points="3,4 6,7 9,4" />
-                    </svg>
-                </span>
-            </button>
-
-            {#if hostsOpen}
-                <div class="accordion-body">
-                    {#if sessions.length === 0}
-                        <p class="empty-hint">
-                            No previously connected hosts found.
-                        </p>
-                    {:else}
-                        {#each sessions as session}
-                            <div class="host-row">
-                                <div class="host-info">
-                                    <span class="host-label"
-                                        >{session.label}</span
-                                    >
-                                    <code class="host-detail"
-                                        >{session.username}@{session.targetIp}
-                                        via {session.bastionIp}</code
-                                    >
-                                    <span class="host-time"
-                                        >{formatDate(session.connectedAt)}</span
-                                    >
-                                </div>
-                                <button
-                                    class="delete-btn"
-                                    title="Remove host"
-                                    onclick={() =>
-                                        handleDeleteSession(session.sessionKey)}
-                                >
-                                    <svg
-                                        width="10"
-                                        height="10"
-                                        viewBox="0 0 10 10"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="1.5"
-                                        stroke-linecap="round"
-                                    >
-                                        <line x1="2" y1="2" x2="8" y2="8" />
-                                        <line x1="8" y1="2" x2="2" y2="8" />
-                                    </svg>
-                                </button>
-                            </div>
-                        {/each}
-                    {/if}
-                </div>
-            {/if}
-        </section>
-
-
         <!-- font size selection -->
         <section class="section">
             <h2 class="section-title">Preferred Font Size</h2>
@@ -370,12 +237,14 @@
             >
         </div>
     </div>
+    <!-- svelte-ignore a11y_missing_attribute -->
+    <iframe src="https://moses.apps.slc.net" frameborder="0"></iframe>
 </div>
 
 <style>
     .settings-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         gap: 24px;
         padding: 24px 40px;
     }
@@ -565,116 +434,6 @@
         font-size: 11px;
         color: var(--sf-accent);
         word-break: break-all;
-    }
-
-    /* ── Accordion ────────────────────────────────────── */
-    .accordion-toggle {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 14px 18px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: var(--sf-text-secondary);
-    }
-
-    .accordion-toggle:hover {
-        background: var(--sf-bg-hover);
-    }
-
-    .accordion-arrow {
-        transition: transform 0.2s ease;
-        display: flex;
-    }
-
-    .accordion-arrow.open {
-        transform: rotate(180deg);
-    }
-
-    .accordion-body {
-        border-top: 1px solid var(--sf-border);
-        padding: 8px 18px 14px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
-
-    .empty-hint {
-        font-size: 11px;
-        color: var(--sf-text-hint);
-        font-style: italic;
-        margin: 8px 0;
-        font-family: var(--sf-font-ui);
-    }
-
-    .host-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 8px 10px;
-        border-radius: var(--sf-radius-sm);
-        transition: background 0.12s;
-    }
-
-    .host-row:hover {
-        background: var(--sf-bg-hover);
-    }
-
-    .host-info {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-    }
-
-    .host-label {
-        font-family: var(--sf-font-ui);
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--sf-text-primary);
-    }
-
-    .host-detail {
-        font-family: var(--sf-font-mono);
-        font-size: 10px;
-        color: var(--sf-text-accent);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .host-time {
-        font-family: var(--sf-font-ui);
-        font-size: 9px;
-        color: var(--sf-text-hint);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
-
-    .delete-btn {
-        flex-shrink: 0;
-        width: 22px;
-        height: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: none;
-        border: 1px solid transparent;
-        border-radius: var(--sf-radius-sm);
-        color: var(--sf-text-hint);
-        cursor: pointer;
-        transition:
-            background 0.12s,
-            color 0.12s,
-            border-color 0.12s;
-    }
-
-    .delete-btn:hover {
-        background: rgba(239, 83, 80, 0.12);
-        color: var(--sf-status-error);
-        border-color: rgba(239, 83, 80, 0.25);
     }
 
     /* ── Save bar ─────────────────────────────────────── */

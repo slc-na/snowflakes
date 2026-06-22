@@ -139,6 +139,12 @@
 
         const customKeyHandler = (e: KeyboardEvent) => {
 
+            if (e.key === "Escape" && term) {
+                e.preventDefault();
+                term.blur();
+                return false;
+            }
+
             let increment = 0;
 
             if (e.type === 'keydown' && e.ctrlKey && term && fitAddon) {

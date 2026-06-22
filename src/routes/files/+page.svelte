@@ -1,9 +1,10 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
+    import { page } from "$app/stores";
 
     import type { SessionInfo } from "../../types/settings";
-    import { loadAllSessions, deleteSessionInfo } from "../../controller/local";
+    import { loadAllSessions, loadSessionInfo, deleteSessionInfo } from "../../controller/local";
     import { reconnectToSession } from "../../controller/ssh";
     import { deleteSessionPass } from "../../controller/vault";
     import { clearTerminalState } from "../../controller/session";
@@ -113,6 +114,19 @@
     onMount(async () => {
         try {
             sessions = await loadAllSessions();
+
+            const key = $page.url.searchParams.get("key");
+            if (key) {
+                const info = (await loadSessionInfo(key)) ?? {
+                    sessionKey: key,
+                    username: "",
+                    targetIp: key,
+                    bastionIp: "",
+                    label: key,
+                    connectedAt: Date.now(),
+                };
+                sftpSession = { key, info };
+            }
         } catch (err) {
             console.error("[Home] Failed to load sessions:", err);
             showToast("Failed to load sessions.", "error");

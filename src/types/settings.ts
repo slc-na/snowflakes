@@ -1,8 +1,6 @@
 export type SnowflakesSettings = {
     bastionIp: string;
     sshTemplate: string;
-    apiKey: string;
-    backendUrl: string;
     fontSize: number;
 };
 
@@ -24,7 +22,5 @@ export type DefaultAccount = {
 export const DEFAULT_SETTINGS: SnowflakesSettings = {
     bastionIp: "",
     sshTemplate: "ssh -t {username}@{bastion} ssh {username}@{target}",
-    apiKey: "",
-    backendUrl: "",
     fontSize: 13
 };

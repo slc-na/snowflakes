@@ -1,10 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
+  import { toast } from "svelte-sonner";
   import NewHostModal from "../components/modal/NewHostModal.svelte";
+  import EditServerModal from "../components/modal/EditServerModal.svelte";
   import type { SessionInfo } from "../types/settings";
-  import { getAllServers } from "../controller/local";
-  import { invoke } from '@tauri-apps/api/core';
+  import { getAllServers, getCachedServers, updateServer, loadSettings } from "../controller/local";
+  import { loadDefaultAccount } from "../controller/vault";
+  import { connectToSession } from "../controller/ssh";
+  import * as sftp from "../controller/sftp";
   import type { ServerAttribute } from "../types/servers";
 
   let isModalOpen = $state(false);
@@ -16,14 +20,16 @@
   let connectingStatus = $state("");
   let errorMsg = $state("");
 
+  let editModalOpen = $state(false);
+  let editModalMode = $state<"ssh" | "sftp">("ssh");
+  let editModalServer = $state<ServerAttribute | null>(null);
+
   let searchQuery = $state("");
   let sortKey = $state<"name" | "ip">("name");
   let sortDir = $state<"asc" | "desc">("asc");
-  let filterOnline = $state(false); 
 
   let filteredServers = $derived(() => {
     let list = [...servers];
-    console.log(list);
 
     const q = searchQuery.trim().toLowerCase();
     if (q) {
@@ -47,10 +53,17 @@
   });
 
   onMount(async () => {
+    const cached = getCachedServers();
+    if (cached) {
+      servers = cached;
+      isLoading = false;
+    }
+
     try {
       servers = await getAllServers();
     } catch (err) {
       console.error("[Home] Failed to load servers:", err);
+      if (!cached) toast.error("Failed to load servers.");
     } finally {
       isLoading = false;
     }
@@ -61,17 +74,100 @@
     isModalOpen = true;
   }
 
-  function handleServerCardClick(server: ServerAttribute) {
-    prefillSession = {
-      sessionKey: "",          
-      targetIp: server.ip,
-      label: server.name,
-      username: "",
-      password: "",
-      bastionIp: "",
-      connectedAt: 0,
-    };
-    isModalOpen = true;
+  async function getQuickConnectDefaults() {
+    const account = await loadDefaultAccount();
+    if (!account.username) {
+      toast.error("Set a Default Account in Settings before using Quick Connect.");
+      return null;
+    }
+
+    const settings = await loadSettings();
+    if (!settings.bastionIp) {
+      toast.error("Set a Default Bastion Server IP in Settings before using Quick Connect.");
+      return null;
+    }
+
+    return { account, bastionIp: settings.bastionIp };
+  }
+
+  async function handleQuickSsh(e: MouseEvent, server: ServerAttribute) {
+    e.stopPropagation();
+    const defaults = await getQuickConnectDefaults();
+    if (!defaults) return;
+
+    isConnecting = true;
+    connectingStatus = "Connecting…";
+    errorMsg = "";
+    try {
+      await connectToSession(
+        {
+          sessionKey: "",
+          username: defaults.account.username,
+          password: defaults.account.password,
+          targetIp: server.ip,
+          bastionIp: defaults.bastionIp,
+          label: server.name,
+          connectedAt: Date.now(),
+        },
+        (msg) => {
+          connectingStatus = msg;
+        },
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      isConnecting = false;
+    }
+  }
+
+  async function handleQuickSftp(e: MouseEvent, server: ServerAttribute) {
+    e.stopPropagation();
+    const defaults = await getQuickConnectDefaults();
+    if (!defaults) return;
+
+    isConnecting = true;
+    connectingStatus = "Establishing SFTP tunnel…";
+    try {
+      const key = await sftp.connectToSftpSession(
+        {
+          sessionKey: "",
+          username: defaults.account.username,
+          password: defaults.account.password,
+          targetIp: server.ip,
+          bastionIp: defaults.bastionIp,
+          label: server.name,
+          connectedAt: Date.now(),
+        },
+        (msg) => {
+          connectingStatus = msg;
+        },
+      );
+      goto(`/files?key=${encodeURIComponent(key)}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      isConnecting = false;
+    }
+  }
+
+  function handleEditSsh(e: MouseEvent, server: ServerAttribute) {
+    e.stopPropagation();
+    editModalMode = "ssh";
+    editModalServer = server;
+    editModalOpen = true;
+  }
+
+  function handleEditSftp(e: MouseEvent, server: ServerAttribute) {
+    e.stopPropagation();
+    editModalMode = "sftp";
+    editModalServer = server;
+    editModalOpen = true;
+  }
+
+  async function handleSaveServer(updated: ServerAttribute) {
+    await updateServer(updated);
+    servers = servers.map((s) => (s.id === updated.id ? updated : s));
+    toast.success("Server updated.");
   }
 
   function toggleSort(key: "name" | "ip") {
@@ -196,11 +292,7 @@
         {:else}
           <div class="grid">
             {#each filteredServers() as server (server.id)}
-              <button
-                class="card server-card"
-                id="server-{server.id}"
-                onclick={() => handleServerCardClick(server)}
-              >
+              <div class="card server-card" id="server-{server.id}">
                 <div class="card-top">
                   <div class="card-title-row">
                     <div class="server-badge">
@@ -211,32 +303,59 @@
                     </div>
                     <h3 class="hostname">{server.name}</h3>
                   </div>
-                  <span class="connect-hint">
-                    Connect
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                  </span>
+                  <span class="os-badge">{server.os}</span>
                 </div>
 
                 <div class="card-meta">
-                  <code class="user-ip">{server.ip}</code>
+                  <code class="user-ip">{server.ip}:{server.port}</code>
                   {#if server.description}
                     <span class="label-text">{server.description}</span>
                   {/if}
                 </div>
 
-                <div class="card-footer">
-                  <span class="ip-badge">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                      <circle cx="12" cy="10" r="3"></circle>
+                <div class="card-actions">
+                  <button
+                    class="action-btn primary"
+                    title="Quick connect via SSH using your Default Account"
+                    onclick={(e) => handleQuickSsh(e, server)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
                     </svg>
-                    {server.ip}
-                  </span>
-                  <span class="click-hint">Click to connect</span>
+                    SSH
+                  </button>
+                  <button
+                    class="action-btn primary"
+                    title="Quick connect via SFTP using your Default Account"
+                    onclick={(e) => handleQuickSftp(e, server)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    SFTP
+                  </button>
+                  <button
+                    class="action-btn"
+                    title="Edit SSH connection"
+                    onclick={(e) => handleEditSsh(e, server)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>
+                    </svg>
+                  </button>
+                  <button
+                    class="action-btn"
+                    title="Edit SFTP connection"
+                    onclick={(e) => handleEditSftp(e, server)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>
+                    </svg>
+                  </button>
                 </div>
-              </button>
+              </div>
             {/each}
           </div>
         {/if}
@@ -263,6 +382,14 @@
     isOpen={isModalOpen}
     onClose={() => (isModalOpen = false)}
     prefill={prefillSession}
+  />
+
+  <EditServerModal
+    isOpen={editModalOpen}
+    mode={editModalMode}
+    server={editModalServer}
+    onClose={() => (editModalOpen = false)}
+    onSave={handleSaveServer}
   />
 </main>
 
@@ -487,10 +614,7 @@
   /* ── Server Card ──────────────────────────────────────────── */
   .server-card {
     border-left: 2px solid transparent;
-  }
-
-  .server-card:hover .connect-hint {
-    opacity: 1;
+    cursor: default;
   }
 
   .server-badge {
@@ -511,26 +635,56 @@
     background: rgba(79, 195, 247, 0.2);
   }
 
-  .ip-badge {
+  .os-badge {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--sf-text-hint);
+    background: var(--sf-bg-hover);
+    border: 1px solid var(--sf-border);
+    border-radius: var(--sf-radius-pill);
+    padding: 2px 8px;
+    flex-shrink: 0;
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 6px;
+    border-top: 1px solid rgba(26, 51, 82, 0.6);
+    padding-top: 12px;
+  }
+
+  .action-btn {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-family: var(--sf-font-mono);
+    justify-content: center;
+    gap: 5px;
+    background: var(--sf-bg-hover);
+    border: 1px solid var(--sf-border);
+    border-radius: var(--sf-radius-sm);
+    color: var(--sf-text-secondary);
     font-size: 10px;
-    color: var(--sf-text-hint);
-    letter-spacing: 0.02em;
-  }
-
-  .click-hint {
-    font-size: 10px;
-    color: var(--sf-text-hint);
-    opacity: 0;
-    transition: opacity 0.15s;
+    font-weight: 600;
     letter-spacing: 0.03em;
+    padding: 6px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
   }
 
-  .server-card:hover .click-hint {
-    opacity: 1;
+  .action-btn:not(.primary) {
+    flex: 0 0 auto;
+    padding: 6px 9px;
+  }
+
+  .action-btn.primary {
+    flex: 1;
+  }
+
+  .action-btn:hover {
+    border-color: var(--sf-accent);
+    color: var(--sf-accent);
+    background: var(--sf-accent-dim);
   }
 
   /* ── Card internals ───────────────────────────────────────── */
@@ -547,22 +701,6 @@
     gap: 8px;
     min-width: 0;
     flex: 1;
-  }
-
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .status-dot.online {
-    background: var(--sf-status-online);
-    box-shadow: 0 0 6px rgba(38, 198, 160, 0.5);
-  }
-
-  .status-dot.offline {
-    background: var(--sf-status-offline);
   }
 
   .hostname {
@@ -589,27 +727,6 @@
     display: block;
   }
 
-  .delete-btn {
-    background: none;
-    border: none;
-    color: var(--sf-text-hint);
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
-    transition: all 0.15s;
-    opacity: 0;
-    flex-shrink: 0;
-  }
-
-  .card:hover .delete-btn {
-    opacity: 1;
-  }
-
-  .delete-btn:hover {
-    color: var(--sf-status-error);
-    background: rgba(239, 83, 80, 0.1);
-  }
-
   .card-meta {
     display: flex;
     flex-direction: column;
@@ -626,39 +743,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     display: block;
-  }
-
-  .last-seen {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 10px;
-    color: var(--sf-text-hint);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 500;
-  }
-
-  .card-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-top: 1px solid rgba(26, 51, 82, 0.6);
-    padding-top: 12px;
-  }
-
-  .connect-hint {
-    opacity: 0;
-    transition: opacity 0.15s;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--sf-accent);
-    flex-shrink: 0;
   }
 
   /* ── Empty state ──────────────────────────────────────────── */

@@ -48,6 +48,14 @@
     // ini handle key event yg diluar terminal
     function handleKeyDown(e: KeyboardEvent){
 
+        // Esc lepasin focus dari terminal, supaya Ctrl+Tab / Ctrl+Shift+Tab / Ctrl+T
+        // (handled di window-level listener di SessionTabBar) bisa dipakai pindah/keluar sesi
+        if (e.key === "Escape") {
+            e.preventDefault();
+            term.blur();
+            return false;
+        }
+
         if (e.ctrlKey) {
             if (e.key === "=" || e.key === "+") {
                 e.preventDefault();

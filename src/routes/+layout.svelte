@@ -2,7 +2,6 @@
 	import { page } from "$app/stores";
 	import {
 		House,
-		Folders,
 		ShieldCheck,
 		ArrowLeftRight,
 		Settings,
@@ -17,11 +16,11 @@
 	import SessionTabBar from "../components/terminal/SessionTabBar.svelte";
 	import { Toaster } from 'svelte-sonner';
 	import { onMount } from "svelte";
+	import { loadAppZoom, applyAppZoom, incrementAppZoom, resetAppZoom } from "$lib/appZoom";
 
 	const menus = [
 		{ icon: House, text: "HOME", href: "/" },
 		{ icon: Clock, text: "RECENTS", href: "/recents" },
-		{ icon: Folders, text: "FILES", href: "/files" },
 		{ icon: ShieldCheck, text: "KNOWN HOSTS", href: "/hosts" },
 		{ icon: ArrowLeftRight, text: "PORT FORWARDING", href: "/ports" },
 		{ icon: LayoutGrid, text: "MULTI WINDOW", href: "/window" },
@@ -29,6 +28,7 @@
 	];
 
 	let theme = $state("dark");
+	let appZoom = $state(1);
 
 	onMount(() => {
 		const stored = localStorage.getItem("sf-theme");
@@ -36,7 +36,29 @@
 			theme = "light";
 			document.documentElement.setAttribute("data-theme", "light");
 		}
+
+		appZoom = loadAppZoom();
+		applyAppZoom(appZoom);
 	});
+
+	function isSessionPage() {
+		return $page.url.pathname.includes("/session");
+	}
+
+	/** @param {KeyboardEvent} e */
+	function handleAppZoomKeydown(e) {
+		if (!e.ctrlKey || isSessionPage()) return;
+		if (e.key === "=" || e.key === "+") {
+			e.preventDefault();
+			appZoom = incrementAppZoom(appZoom, 1);
+		} else if (e.key === "-") {
+			e.preventDefault();
+			appZoom = incrementAppZoom(appZoom, -1);
+		} else if (e.key === "0") {
+			e.preventDefault();
+			appZoom = resetAppZoom();
+		}
+	}
 
 	function toggleTheme() {
 		if (theme === "dark") {
@@ -53,11 +75,14 @@
 	let showTabBar = $derived(menus.some(
 		(menu) =>
 			menu.href === $page.url.pathname ||
-			$page.url.pathname.includes("/session"),
+			$page.url.pathname.includes("/session") ||
+			$page.url.pathname.includes("/files"),
 	));
 	
 	let isLoginPage = $derived($page.url.pathname === '/login');
 </script>
+
+<svelte:window onkeydown={handleAppZoomKeydown} />
 
 <TitleBar />
 

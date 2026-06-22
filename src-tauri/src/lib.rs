@@ -137,6 +137,7 @@ pub fn run() {
             oauth::auth::oauth_is_authenticated,
             store::user::get_user_info,
             http::server::get_server,
+            http::server::update_server,
             http::shell::get_shell,
             http::shell::update_shell,
             http::shell::insert_shell,

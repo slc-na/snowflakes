@@ -21,6 +21,19 @@
   let connectingStatus = $state("");
   let errorMsg = $state("");
 
+  let searchQuery = $state("");
+
+  let filteredSessions = $derived.by(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return sessions;
+    return sessions.filter(
+      (s) =>
+        s.label.toLowerCase().includes(q) ||
+        s.targetIp.toLowerCase().includes(q) ||
+        s.username.toLowerCase().includes(q),
+    );
+  });
+
   onMount(async () => {
     try {
       sessions = await loadAllSessions();
@@ -89,15 +102,33 @@
               </svg>
             </span>
             <h2 class="section-title">Recent Sessions</h2>
-            <span class="section-count">{sessions.length}</span>
+            <span class="section-count">{filteredSessions.length}</span>
           </div>
 
-          <button class="btn-new-host" id="new-host-btn" onclick={handleNewHost}>
-            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M10 4v12M4 10h12"/>
-            </svg>
-            New Host
-          </button>
+          <div class="toolbar">
+            <div class="search-wrap">
+              <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+              </svg>
+              <input
+                id="recents-search"
+                class="search-input"
+                type="text"
+                placeholder="Search by label, host, or user…"
+                bind:value={searchQuery}
+              />
+              {#if searchQuery}
+                <button class="search-clear" onclick={() => (searchQuery = "")}>✕</button>
+              {/if}
+            </div>
+
+            <button class="btn-new-host" id="new-host-btn" onclick={handleNewHost}>
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10 4v12M4 10h12"/>
+              </svg>
+              New Host
+            </button>
+          </div>
         </div>
 
         {#if isLoading}
@@ -111,18 +142,24 @@
               </div>
             {/each}
           </div>
-        {:else if sessions.length === 0}
+        {:else if filteredSessions.length === 0}
           <div class="empty-state">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.3">
               <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
               <polyline points="13 2 13 9 20 9"></polyline>
             </svg>
-            <span class="empty-title">No recent sessions</span>
-            <span class="empty-sub">Click <strong>New Host</strong></span>
+            <span class="empty-title">{searchQuery ? "No sessions match your search" : "No recent sessions"}</span>
+            <span class="empty-sub">
+              {#if searchQuery}
+                Try a different keyword or clear the filter
+              {:else}
+                Click <strong>New Host</strong>
+              {/if}
+            </span>
           </div>
         {:else}
           <div class="grid">
-            {#each sessions as session (session.sessionKey)}
+            {#each filteredSessions as session (session.sessionKey)}
               <div
                 class="card group"
                 onclick={() => handleCardClick(session)}
@@ -234,6 +271,66 @@
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  /* ── Toolbar ──────────────────────────────────────────────── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 9px;
+    color: var(--sf-text-hint);
+    pointer-events: none;
+  }
+
+  .search-input {
+    background: var(--sf-bg-surface);
+    border: 1px solid var(--sf-border);
+    border-radius: var(--sf-radius-md);
+    padding: 6px 28px 6px 28px;
+    font-size: 12px;
+    color: var(--sf-text-primary);
+    outline: none;
+    width: 220px;
+    font-family: var(--sf-font-ui);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .search-input:focus {
+    border-color: var(--sf-accent);
+    box-shadow: 0 0 0 2px var(--sf-accent-glow);
+  }
+
+  .search-input::placeholder {
+    color: var(--sf-text-hint);
+  }
+
+  .search-clear {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--sf-text-hint);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 2px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+
+  .search-clear:hover {
+    color: var(--sf-text-primary);
   }
 
   .section-icon {

@@ -6,17 +6,20 @@
     import SessionTab from "./SessionTab.svelte";
     import { page } from "$app/state";
     import { connectToSession, deleteSession } from "../../controller/ssh";
+    import { disconnectSftp } from "../../controller/sftp";
     import ErrorModal from "../modal/ErrorModal.svelte";
     import { loadSessionInfo } from "../../controller/local";
     import { loadSessionPass } from "../../controller/vault";
 
     type SessionStatus = "connected" | "connecting" | "disconnected" | "error";
+    type SessionKind = "ssh" | "sftp";
 
     type Session = {
         id: string;
         label: string;
         status: SessionStatus;
         hasActivity: boolean;
+        kind: SessionKind;
     };
 
     export let showAddButton: boolean = false;
@@ -33,15 +36,21 @@
     $: connectedCount = sessions.filter((s) => s.status === "connected").length;
     $: errorCount = sessions.filter((s) => s.status === "error").length;
 
+    let unlistenSftpSessionUpdated: UnlistenFn | null = null;
+
     async function fetchSessions(
         activeNow: string | null = null,
     ): Promise<void> {
         try {
-            const keys = await invoke<string[]>("get_active_session");
-            const existingIds = new Set(sessions.map((s) => s.id));
-            const newKeys = new Set(keys);
+            const [sshKeys, sftpKeys] = await Promise.all([
+                invoke<string[]>("get_active_session"),
+                invoke<string[]>("get_active_sftp_session").catch(() => []),
+            ]);
 
-            for (const key of keys) {
+            const existingIds = new Set(sessions.map((s) => s.id));
+            const newIds = new Set([...sshKeys, ...sftpKeys]);
+
+            for (const key of sshKeys) {
                 if (!existingIds.has(key)) {
                     sessions = [
                         ...sessions,
@@ -50,14 +59,30 @@
                             label: key,
                             status: "connected",
                             hasActivity: false,
+                            kind: "ssh",
                         },
                     ];
                 }
             }
 
-            sessions = sessions.filter((s) => newKeys.has(s.id));
+            for (const key of sftpKeys) {
+                if (!existingIds.has(key)) {
+                    sessions = [
+                        ...sessions,
+                        {
+                            id: key,
+                            label: key,
+                            status: "connected",
+                            hasActivity: false,
+                            kind: "sftp",
+                        },
+                    ];
+                }
+            }
+
+            sessions = sessions.filter((s) => newIds.has(s.id));
         } catch (err) {
-            console.error("[SessionTabBar] get_active_session error:", err);
+            console.error("[SessionTabBar] fetchSessions error:", err);
         }
     }
 
@@ -71,21 +96,34 @@
                 activeId = activeNow.payload as string;
             },
         );
+        unlistenSftpSessionUpdated = await listen("sftp_session_updated", () => {
+            fetchSessions();
+        });
     });
 
     onDestroy(() => {
         if (unlistenSessionUpdated) unlistenSessionUpdated();
+        if (unlistenSftpSessionUpdated) unlistenSftpSessionUpdated();
     });
 
     function selectSession(id: string): void {
+        const session = sessions.find((s) => s.id === id);
         activeId = id;
         tick().then(() => scrollTabIntoView(id));
-        console.log(`/session?key=${encodeURIComponent(id)}`);
-        goto(`/session?key=${encodeURIComponent(id)}`);
+        if (session?.kind === "sftp") {
+            goto(`/files?key=${encodeURIComponent(id)}`);
+        } else {
+            goto(`/session?key=${encodeURIComponent(id)}`);
+        }
     }
 
     async function duplicateSession(id: string): Promise<void> {
-        
+        const session = sessions.find((s) => s.id === id);
+        if (session?.kind === "sftp") {
+            // SFTP sessions don't have a duplicate flow yet
+            return;
+        }
+
         let sessionInfo = await loadSessionInfo(id)
         if(!sessionInfo) {
             throw new Error("Session info not found")
@@ -114,8 +152,13 @@
     }
 
     async function closeSession(id: string): Promise<void> {
+        const session = sessions.find((s) => s.id === id);
         try {
-            await deleteSession(id);
+            if (session?.kind === "sftp") {
+                await disconnectSftp(id);
+            } else {
+                await deleteSession(id);
+            }
         } catch (err) {
             console.warn("[SessionTabBar] disconnect error:", err);
         }
@@ -148,8 +191,24 @@
         tabBarEl?.scrollBy({ left: 160, behavior: "smooth" });
     }
 
+    function isTerminalFocused(): boolean {
+        const active = document.activeElement;
+        return !!active?.closest(".xterm");
+    }
+
     function handleKeydown(e: KeyboardEvent): void {
         if (!e.ctrlKey) return;
+
+        // Ctrl+Tab / Ctrl+Shift+Tab / Ctrl+T only take effect once the terminal
+        // has been blurred (via Esc on the session page) - while it's focused,
+        // these combos are left alone instead of fighting xterm's own key handling.
+        if (
+            (e.key === "Tab" || e.key === "t" || e.key === "T") &&
+            isTerminalFocused()
+        ) {
+            return;
+        }
+
         if (e.key === "Tab") {
             e.preventDefault();
             const idx = sessions.findIndex((s) => s.id === activeId);
@@ -161,6 +220,10 @@
         if (e.key === "w" && activeId !== null) {
             e.preventDefault();
             closeSession(activeId);
+        }
+        if (e.key === "t" || e.key === "T") {
+            e.preventDefault();
+            goto("/");
         }
     }
 </script>
@@ -199,6 +262,7 @@
                     id={session.id}
                     label={session.label}
                     status={session.status}
+                    kind={session.kind}
                     active={session.id === activeId}
                     hasActivity={session.hasActivity ?? false}
                     onselect={selectSession}

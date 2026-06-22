@@ -8,6 +8,7 @@
     export let id: string;
     export let label: string = "New Session";
     export let status: SessionStatus = "disconnected";
+    export let kind: "ssh" | "sftp" = "ssh";
     export let active: boolean = false;
     export let hasActivity: boolean = false;
 
@@ -137,7 +138,21 @@
 
     <!-- Tab content -->
     <span class="tab-body">
-        <span class="tab-label">{label}</span>
+        <span class="tab-label">
+            <span class="kind-icon" class:kind-sftp={kind === "sftp"} aria-hidden="true">
+                {#if kind === "sftp"}
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                    </svg>
+                {:else}
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="4 17 10 11 4 5" />
+                        <line x1="12" y1="19" x2="20" y2="19" />
+                    </svg>
+                {/if}
+            </span>
+            {label}
+        </span>
     </span>
 
     <!-- Activity indicator -->
@@ -260,6 +275,9 @@
     }
 
     .tab-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
         font-size: 12px;
         font-weight: 500;
         overflow: hidden;
@@ -267,6 +285,17 @@
         line-height: 1.3;
         color: inherit;
         letter-spacing: 0.01em;
+    }
+
+    .kind-icon {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        opacity: 0.75;
+    }
+
+    .kind-icon.kind-sftp {
+        color: var(--sf-accent, #4fc3f7);
     }
 
     .activity-dot {

@@ -1,8 +1,10 @@
-import type { ServerAttribute } from "../types/servers";
+import type { ServerAttribute, ServerOs } from "../types/servers";
 import { DEFAULT_SETTINGS, type SessionInfo, type SnowflakesSettings } from "../types/settings";
 import { invoke } from '@tauri-apps/api/core';
 
 const SETTINGS_KEY = "snowflakes_settings";
+const SERVERS_CACHE_KEY = "snowflakes_servers_cache";
+const SERVER_OVERRIDES_KEY = "snowflakes_server_overrides";
 
 
 
@@ -50,7 +52,47 @@ export async function loadAllSessions(): Promise<SessionInfo[]> {
     return sessions;
 }
 
-export async function getAllServers() : Promise<ServerAttribute[]>{
+type ServerOverride = { os?: ServerOs; port?: number };
+
+function loadServerOverrides(): Record<string, ServerOverride> {
+    const raw = localStorage.getItem(SERVER_OVERRIDES_KEY);
+    if (!raw) return {};
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return {};
+    }
+}
+
+export function saveServerOverride(serverId: string, override: ServerOverride): void {
+    const overrides = loadServerOverrides();
+    overrides[serverId] = { ...overrides[serverId], ...override };
+    localStorage.setItem(SERVER_OVERRIDES_KEY, JSON.stringify(overrides));
+}
+
+function applyServerOverrides(servers: ServerAttribute[]): ServerAttribute[] {
+    const overrides = loadServerOverrides();
+    return servers.map((server) => ({
+        ...server,
+        ...overrides[server.id],
+    }));
+}
+
+export function getCachedServers(): ServerAttribute[] | null {
+    const raw = localStorage.getItem(SERVERS_CACHE_KEY);
+    if (!raw) return null;
+    try {
+        return applyServerOverrides(JSON.parse(raw));
+    } catch {
+        return null;
+    }
+}
+
+function cacheServers(servers: ServerAttribute[]): void {
+    localStorage.setItem(SERVERS_CACHE_KEY, JSON.stringify(servers));
+}
+
+export async function getAllServers(): Promise<ServerAttribute[]> {
     const raw: any = await invoke("get_server");
     const data = raw.data;
     const servers: ServerAttribute[] = data.map((item: any) => ({
@@ -58,6 +100,21 @@ export async function getAllServers() : Promise<ServerAttribute[]>{
         name: item.name,
         ip: item.ip,
         description: item.description,
+        os: "linux" as ServerOs,
+        port: 22,
     }));
-    return servers;
+    cacheServers(servers);
+    return applyServerOverrides(servers);
+}
+
+export async function updateServer(server: ServerAttribute): Promise<void> {
+    saveServerOverride(server.id, { os: server.os, port: server.port });
+    await invoke("update_server", {
+        serverId: server.id,
+        params: {
+            name: server.name,
+            ip: server.ip,
+            description: server.description,
+        },
+    });
 }
