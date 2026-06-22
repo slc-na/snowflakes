@@ -23,7 +23,7 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-ssh2 = "0.9"
+ssh2 = { version = "0.9", features = ["vendored-openssl"] }
 tokio = { version = "1", features = ["full"] }
 tauri-plugin-stronghold = "2"
 rust-argon2 = "3.0"

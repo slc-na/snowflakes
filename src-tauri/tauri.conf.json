@@ -49,7 +49,7 @@
 
         "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ0QzhGQTczNTg1QUI3MUQKUldRZHQxcFljL3JJUkgxNnpyQzB6czZRNW4vNU1QRGlDK3ZJajlPYUJvckdscTNKSXE0ZlVtb1gK",
         "endpoints": [
-          "http://localhost:8080/version/latest"
+          "http://localhost:8080/api/v1/version/latest"
         ]
       }
     }

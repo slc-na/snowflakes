@@ -13,13 +13,13 @@
     { icon: House, text: "HOME", href: "/", isActive: true },
     { icon: Clock, text: "RECENTS", href: "/recents", isActive: false },
     { icon: Folders, text: "FILES", href: "/files", isActive: false },
-    { icon: ShieldCheck, text: "KNOWN HOSTS", href: "/hosts", isActive: false },
-    {
-      icon: ArrowLeftRight,
-      text: "PORT FORWARDING",
-      href: "/ports",
-      isActive: false,
-    },
+    // { icon: ShieldCheck, text: "KNOWN HOSTS", href: "/hosts", isActive: false },
+    // {
+    //   icon: ArrowLeftRight,
+    //   text: "PORT FORWARDING",
+    //   href: "/ports",
+    //   isActive: false,
+    // },
     { icon: Settings, text: "SETTINGS", href: "/settings", isActive: false },
   ];
 </script>

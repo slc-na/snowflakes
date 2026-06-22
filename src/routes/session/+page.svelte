@@ -64,29 +64,29 @@
 
 
         // handle ctrl + alt +  c = copy
-        if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'c') {
-            if (e.type === 'keydown') {
-                const selection = term.getSelection();
-                if (selection) {
-                    navigator.clipboard.writeText(selection);
-                }
-            }
-            e.preventDefault();
-            return false; // stop xterm from processing this further
-        }
+        // if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'c') {
+        //     if (e.type === 'keydown') {
+        //         const selection = term.getSelection();
+        //         if (selection) {
+        //             navigator.clipboard.writeText(selection);
+        //         }
+        //     }
+        //     e.preventDefault();
+        //     return false; // stop xterm from processing this further
+        // }
 
         // Ctrl+Alt+V — Paste
-        if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'v') {
-            if (e.type === 'keydown') {
-                navigator.clipboard.readText().then((text) => {
-                    term.paste(text);
-                }).catch((err) => {
-                    console.error("Clipboard read failed:", err);
-                });
-            }
-            e.preventDefault();
-            return false;
-        }
+        // if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'v') {
+        //     if (e.type === 'keydown') {
+        //         navigator.clipboard.readText().then((text) => {
+        //             term.paste(text);
+        //         }).catch((err) => {
+        //             console.error("Clipboard read failed:", err);
+        //         });
+        //     }
+        //     e.preventDefault();
+        //     return false;
+        // }
 
         return true; // let xterm handle everything else normally
     };
