@@ -102,10 +102,10 @@
 
     onDestroy(() => {
         unlisteners.forEach((fn) => fn());
-        invoke("disconnect_sftp", {
-            sessionKey,
-            window: null,
-        }).catch(() => {});
+        // Don't auto-disconnect here - this fires on every unmount, including
+        // just navigating away to another tab. The SFTP session should stay
+        // alive in the backend (like SSH sessions do) until the user explicitly
+        // closes it via onClose, which already calls disconnectSftp itself.
     });
 
     async function navigateTo(path: string) {
@@ -1378,8 +1378,11 @@
 
 <style>
     /* ── Overlay / Layout ────────────────────────────── */
+    /* Positioned absolute (not fixed) so it's scoped to the page's content
+       area (its nearest positioned ancestor) instead of covering the whole
+       viewport - keeps the sidebar and session tab bar visible above it. */
     .fs-overlay {
-        position: fixed;
+        position: absolute;
         inset: 0;
         z-index: 50;
         background: var(--sf-bg-app);
@@ -1391,9 +1394,8 @@
     .fs-layout {
         display: flex;
         flex-direction: column;
-        height: 100vh;
+        height: 100%;
         overflow: hidden;
-        margin-top: 32px;
     }
 
     @keyframes fade-in {

@@ -667,10 +667,21 @@
 {/if}
 
 <style>
+    /* Scopes the SFTP overlay below to this page's content area instead of
+       the whole viewport, so it doesn't paint over the sidebar/tab bar. */
+    main {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
     /* ── App Shell ───────────────────────────────────────────────────────── */
     .app-shell {
         width: 100%;
-        min-height: 100vh;
+        height: 100%;
         display: flex;
         flex-direction: column;
         background: var(--sf-bg-app);

@@ -21,8 +21,6 @@
 	const menus = [
 		{ icon: House, text: "HOME", href: "/" },
 		{ icon: Clock, text: "RECENTS", href: "/recents" },
-		{ icon: ShieldCheck, text: "KNOWN HOSTS", href: "/hosts" },
-		{ icon: ArrowLeftRight, text: "PORT FORWARDING", href: "/ports" },
 		{ icon: LayoutGrid, text: "MULTI WINDOW", href: "/window" },
 		{ icon: Settings, text: "SETTINGS", href: "/settings" },
 	];
