@@ -27,7 +27,7 @@
         if (!isOpen || !server) return;
         name = server.name;
         ip = server.ip;
-        port = server.port;
+        port = server.ssh_port;
         os = server.os;
         description = server.description;
         errorMsg = "";
@@ -38,7 +38,7 @@
         errorMsg = "";
         isSaving = true;
         try {
-            await onSave({ ...server, name, ip, port, os, description });
+            await onSave({ ...server, name, ip, ssh_port: port, os, description });
             onClose();
         } catch (e) {
             errorMsg = e instanceof Error ? e.message : String(e);

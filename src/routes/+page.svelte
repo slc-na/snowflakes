@@ -307,7 +307,7 @@
                 </div>
 
                 <div class="card-meta">
-                  <code class="user-ip">{server.ip}:{server.port}</code>
+                  <code class="user-ip">{server.ip}:{server.ssh_port}</code>
                   {#if server.description}
                     <span class="label-text">{server.description}</span>
                   {/if}

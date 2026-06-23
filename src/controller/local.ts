@@ -52,7 +52,7 @@ export async function loadAllSessions(): Promise<SessionInfo[]> {
     return sessions;
 }
 
-type ServerOverride = { os?: ServerOs; port?: number };
+type ServerOverride = { os?: ServerOs; ssh_port?: number };
 
 function loadServerOverrides(): Record<string, ServerOverride> {
     const raw = localStorage.getItem(SERVER_OVERRIDES_KEY);
@@ -100,21 +100,23 @@ export async function getAllServers(): Promise<ServerAttribute[]> {
         name: item.name,
         ip: item.ip,
         description: item.description,
-        os: "linux" as ServerOs,
-        port: 22,
+        os: item.os as ServerOs,
+        ssh_port: item.ssh_port,
     }));
     cacheServers(servers);
     return applyServerOverrides(servers);
 }
 
 export async function updateServer(server: ServerAttribute): Promise<void> {
-    saveServerOverride(server.id, { os: server.os, port: server.port });
+    saveServerOverride(server.id, { os: server.os, ssh_port: server.ssh_port });
     await invoke("update_server", {
-        serverId: server.id,
+        serverId: String(server.id),
         params: {
             name: server.name,
             ip: server.ip,
             description: server.description,
+            os : server.os,
+            ssh_port: server.ssh_port,
         },
     });
 }

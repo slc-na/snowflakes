@@ -6,5 +6,5 @@ export type ServerAttribute = {
     ip: string;
     name: string;
     os: ServerOs;
-    port: number;
+    ssh_port: number;
 };
