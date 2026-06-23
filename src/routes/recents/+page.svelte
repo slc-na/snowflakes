@@ -22,6 +22,7 @@
   let errorMsg = $state("");
 
   let searchQuery = $state("");
+  let searchInputEl = $state<HTMLInputElement | null>(null);
 
   let filteredSessions = $derived.by(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -35,6 +36,8 @@
   });
 
   onMount(async () => {
+    searchInputEl?.focus();
+
     try {
       sessions = await loadAllSessions();
     } catch (err) {
@@ -111,6 +114,7 @@
                 <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
               </svg>
               <input
+                bind:this={searchInputEl}
                 id="recents-search"
                 class="search-input"
                 type="text"

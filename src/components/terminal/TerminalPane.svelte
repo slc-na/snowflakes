@@ -14,7 +14,8 @@
         saveTerminalState,
         loadTerminalState,
     } from "../../controller/session";
-    import { incrementTerminalFont } from "$lib/resizeTerminal";
+    import { incrementTerminalFont, setTerminalFont } from "$lib/resizeTerminal";
+    import { loadSettings } from "../../controller/local";
 
     let { targetKey, onClose } = $props<{
         targetKey: string;
@@ -58,6 +59,10 @@
         term.open(terminalElement);
         fitAddon.fit();
         term.focus();
+
+        loadSettings().then((setting) => {
+            if (term && fitAddon) setTerminalFont(term, fitAddon, setting.fontSize);
+        });
 
         const setupSsh = async (key: string) => {
             isLoading = true;

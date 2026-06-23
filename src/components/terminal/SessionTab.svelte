@@ -44,9 +44,19 @@
     }
 
 
+    // Pas status "connected", warna dotnya dibedain per protocol (ssh/sftp/guacamole)
+    // supaya kelihatan bedanya di tab bar. Status connecting/error/disconnected tetep
+    // pake warna semantic biasa.
+    $: kindColor =
+        kind === "sftp"
+            ? "var(--sf-accent, #4fc3f7)"
+            : kind === "guacamole"
+              ? "#a78bfa"
+              : "var(--sf-status-online)";
+
     $: statusColor =
         status === "connected"
-            ? "var(--sf-status-online)"
+            ? kindColor
             : status === "connecting"
               ? "var(--sf-status-warning)"
               : status === "error"

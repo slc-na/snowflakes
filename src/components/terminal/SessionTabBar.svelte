@@ -186,7 +186,7 @@
             if (session?.kind === "sftp") {
                 await disconnectSftp(id);
             } else if (session?.kind === "guacamole") {
-                disconnectGuacamoleSession(id);
+                await disconnectGuacamoleSession(id);
             } else {
                 await deleteSession(id);
             }

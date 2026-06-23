@@ -4,39 +4,41 @@
     import type { SessionInfo } from "../../types/settings";
     import { loadSessionInfo } from "../../controller/local";
     import {
-        getGuacamoleToken,
+        openGuacamoleWindow,
+        focusGuacamoleWindow,
         disconnectGuacamoleSession,
     } from "../../controller/guacamole";
 
-    const GUACAMOLE_URL = "https://moses.apps.slc.net";
-
     let targetKey = $derived($page.url.searchParams.get("key") || "unknown");
     let session = $state<SessionInfo | null>(null);
-    let iframeEl: HTMLIFrameElement;
+    let errorMsg = $state("");
 
-    function attachAuthToken(): void {
-        const token = getGuacamoleToken(targetKey);
-        if (!token || !iframeEl?.contentWindow) return;
-
+    // The actual Guacamole connection lives in its own Tauri window (see
+    // open_guacamole_window in src-tauri/src/http/guacamole.rs) - an embedded
+    // iframe can't have its localStorage written from this page because of the
+    // browser's same-origin policy, so there's nothing to render here besides a
+    // way to bring that window back to front.
+    async function bringToFront() {
+        errorMsg = "";
         try {
-            iframeEl.contentWindow.localStorage.setItem("GUAC_AUTH_TOKEN", token);
-            iframeEl.contentWindow.location.reload();
+            const focused = await focusGuacamoleWindow(targetKey);
+            if (!focused) {
+                await openGuacamoleWindow(targetKey);
+            }
         } catch (e) {
-            console.warn(
-                "[Guacamole] Failed to inject auth token into iframe (likely blocked by cross-origin policy):",
-                e,
-            );
+            errorMsg = e instanceof Error ? e.message : String(e);
         }
     }
 
     $effect(() => {
         if (targetKey && targetKey !== "unknown") {
             loadSessionInfo(targetKey).then((info) => (session = info));
+            bringToFront();
         }
     });
 
     async function handleDisconnect() {
-        disconnectGuacamoleSession(targetKey);
+        await disconnectGuacamoleSession(targetKey);
         goto("/");
     }
 </script>
@@ -64,13 +66,18 @@
         </button>
     </div>
 
-    <div class="flex-1">
-        <iframe
-            bind:this={iframeEl}
-            src={GUACAMOLE_URL}
-            title="Guacamole Remote Desktop"
-            class="w-full h-full border-0"
-            onload={attachAuthToken}
-        ></iframe>
+    <div class="flex-1 flex flex-col items-center justify-center gap-4 text-[#565f89]">
+        <p class="text-sm">
+            This remote desktop is open in its own window.
+        </p>
+        <button
+            class="text-[12px] px-4 py-2 rounded border border-[#24283b] text-[#7aa2f7] hover:bg-[#1f2335]"
+            onclick={bringToFront}
+        >
+            Bring window to front
+        </button>
+        {#if errorMsg}
+            <p class="text-[11px] text-[#f7768e]">{errorMsg}</p>
+        {/if}
     </div>
 </div>

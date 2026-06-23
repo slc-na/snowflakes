@@ -43,7 +43,11 @@
     async function loadActiveSessions() {
         const keys = await invoke<string[]>("get_active_session");
         const infos = await Promise.all(keys.map((key) => loadSessionInfo(key)));
-        sessions = infos.filter((s): s is SessionInfo => s !== null);
+        sessions = infos
+            .filter((s): s is SessionInfo => s !== null)
+            .sort((a, b) =>
+                (b.label || b.targetIp).localeCompare(a.label || a.targetIp),
+            );
         return new Set(keys);
     }
 

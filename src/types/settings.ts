@@ -21,6 +21,6 @@ export type DefaultAccount = {
 
 export const DEFAULT_SETTINGS: SnowflakesSettings = {
     bastionIp: "",
-    sshTemplate: "ssh -t {username}@{bastion} {target}",
+    sshTemplate: "ssh {username}@{bastion_hostname} --target={target_ip} --type={type->[ssh/exec]?} --exec={}",
     fontSize: 13
 };

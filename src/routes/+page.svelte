@@ -27,6 +27,7 @@
   let searchQuery = $state("");
   let sortKey = $state<"name" | "ip">("name");
   let sortDir = $state<"asc" | "desc">("asc");
+  let searchInputEl = $state<HTMLInputElement | null>(null);
 
   let filteredServers = $derived(() => {
     let list = [...servers];
@@ -53,6 +54,8 @@
   });
 
   onMount(async () => {
+    searchInputEl?.focus();
+
     const cached = getCachedServers();
     if (cached) {
       servers = cached;
@@ -220,6 +223,7 @@
                 <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
               </svg>
               <input
+                bind:this={searchInputEl}
                 id="server-search"
                 class="search-input"
                 type="text"

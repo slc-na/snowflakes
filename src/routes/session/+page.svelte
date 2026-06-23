@@ -50,7 +50,12 @@
 
         // Esc lepasin focus dari terminal, supaya Ctrl+Tab / Ctrl+Shift+Tab / Ctrl+T
         // (handled di window-level listener di SessionTabBar) bisa dipakai pindah/keluar sesi
-        if (e.key === "Escape") {
+        // Re-attach dihandle di handleGlobalEscape (window-level), bukan disini,
+        // karena handler ini cuma kepanggil pas terminal lagi focus.
+        // e.type dicek "keydown" doang - xterm panggil handler ini juga pas keyup,
+        // dan tanpa guard ini, keyup dari Escape yang sama yang baru aja dipake
+        // buat refocus (di handleGlobalEscape) bakal langsung re-blur lagi.
+        if (e.key === "Escape" && e.type === "keydown") {
             e.preventDefault();
             term.blur();
             return false;
@@ -251,16 +256,29 @@
         if (unlistenError) unlistenError();
     }
 
-    function setupWindowEventListeners(){
+    // klo escape kepencet pas terminal lagi gak focus (uda di-blur sebelumnya),
+    // toggle balik focusnya ke terminal. e.defaultPrevented dicek supaya gak
+    // langsung re-focus di event yg sama yg baru aja dipake buat blur (handleKeyDown
+    // udah preventDefault duluan kalo terminal masih focus pas Escape ditekan).
+    function handleGlobalEscape(e: KeyboardEvent){
+        if (e.key !== "Escape" || e.defaultPrevented) return;
+        e.preventDefault();
         
+        term.focus();
+    }
+
+    function setupWindowEventListeners(){
+
 
         window.addEventListener("resize", handleResize);
         window.addEventListener("wheel", handleScroll);
+        window.addEventListener("keydown", handleGlobalEscape);
     }
 
     function removeWindowEventListeners(){
-        window.addEventListener("resize", handleResize);
-        window.addEventListener("wheel", handleScroll);
+        window.removeEventListener("resize", handleResize);
+        window.removeEventListener("wheel", handleScroll);
+        window.removeEventListener("keydown", handleGlobalEscape);
     }
 
     

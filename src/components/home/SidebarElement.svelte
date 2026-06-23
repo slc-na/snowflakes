@@ -1,15 +1,22 @@
-<script>
+<script lang="ts">
   import { goto } from "$app/navigation";
 
   let { text, icon, href, isActive } = $props();
   let isHovered = $state(false);
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      goto(href);
+    }
+  }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="parent {isActive || isHovered ? 'active' : ''}"
   onclick={() => goto(href)}
+  onkeydown={handleKeydown}
   role="button"
   tabindex="0"
   onmouseenter={() => (isHovered = true)}

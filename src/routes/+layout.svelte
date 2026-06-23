@@ -1,5 +1,6 @@
-<script>
+<script lang="ts">
 	import { page } from "$app/stores";
+	import { goto } from "$app/navigation";
 	import {
 		House,
 		ShieldCheck,
@@ -43,8 +44,7 @@
 		return $page.url.pathname.includes("/session");
 	}
 
-	/** @param {KeyboardEvent} e */
-	function handleAppZoomKeydown(e) {
+	function handleAppZoomKeydown(e: KeyboardEvent) {
 		if (!e.ctrlKey || isSessionPage()) return;
 		if (e.key === "=" || e.key === "+") {
 			e.preventDefault();
@@ -55,6 +55,26 @@
 		} else if (e.key === "0") {
 			e.preventDefault();
 			appZoom = resetAppZoom();
+		}
+	}
+
+	const altShortcuts: Record<string, string> = {
+		h: "/",
+		r: "/recents",
+		m: "/window",
+		s: "/settings",
+	};
+
+	function isTerminalTarget(target: EventTarget | null): boolean {
+		return target instanceof HTMLElement && !!target.closest(".xterm");
+	}
+
+	function handleAltShortcuts(e: KeyboardEvent) {
+		if (!e.altKey || isTerminalTarget(e.target)) return;
+		const href = altShortcuts[e.key.toLowerCase()];
+		if (href) {
+			e.preventDefault();
+			goto(href);
 		}
 	}
 
@@ -74,13 +94,19 @@
 		(menu) =>
 			menu.href === $page.url.pathname ||
 			$page.url.pathname.includes("/session") ||
-			$page.url.pathname.includes("/files"),
+			$page.url.pathname.includes("/files") ||
+			$page.url.pathname.includes("/remote"),
 	));
 	
 	let isLoginPage = $derived($page.url.pathname === '/login');
 </script>
 
-<svelte:window onkeydown={handleAppZoomKeydown} />
+<svelte:window
+	onkeydown={(e) => {
+		handleAppZoomKeydown(e);
+		handleAltShortcuts(e);
+	}}
+/>
 
 <TitleBar />
 

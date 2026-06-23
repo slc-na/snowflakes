@@ -26,6 +26,41 @@ export function getGuacamoleToken(sessionKey: string): string | null {
     return sessionStorage.getItem(`${TOKEN_KEY_PREFIX}${sessionKey}`);
 }
 
+// Tauri window labels only allow alphanumeric/-/:/_, which sessionKey already
+// satisfies (ip-with-dashes + uuid), but prefix it so it can't collide with
+// any other window label in the app.
+export function guacamoleWindowLabel(sessionKey: string): string {
+    return `guac-${sessionKey}`;
+}
+
+// Opens (or focuses, if already open) the dedicated webview window that hosts
+// the actual Guacamole remote desktop for this session. Iframe-based token
+// injection is blocked by the browser's same-origin policy, so the real
+// connection lives in its own Tauri window instead - see open_guacamole_window
+// in src-tauri/src/http/guacamole.rs.
+export async function openGuacamoleWindow(sessionKey: string): Promise<void> {
+    const token = getGuacamoleToken(sessionKey);
+    if (!token) {
+        throw new Error("Guacamole token not found for this session - reconnect from the servers page.");
+    }
+    await invoke("open_guacamole_window", {
+        label: guacamoleWindowLabel(sessionKey),
+        token,
+    });
+}
+
+export async function focusGuacamoleWindow(sessionKey: string): Promise<boolean> {
+    return invoke<boolean>("focus_guacamole_window", {
+        label: guacamoleWindowLabel(sessionKey),
+    });
+}
+
+async function closeGuacamoleWindow(sessionKey: string): Promise<void> {
+    await invoke("close_guacamole_window", {
+        label: guacamoleWindowLabel(sessionKey),
+    });
+}
+
 export async function connectToGuacamoleSession(
     server: ServerAttribute,
     onStatus: (status: string) => void,
@@ -58,14 +93,18 @@ export async function connectToGuacamoleSession(
     setActiveGuacamoleSessions([...getActiveGuacamoleSessions(), key]);
     window.dispatchEvent(new CustomEvent(GUACAMOLE_SESSION_UPDATED_EVENT));
 
+    onStatus("Opening remote desktop window...");
+    await openGuacamoleWindow(key);
+
     onStatus("Guacamole session ready.");
     return key;
 }
 
-export function disconnectGuacamoleSession(sessionKey: string): void {
+export async function disconnectGuacamoleSession(sessionKey: string): Promise<void> {
     setActiveGuacamoleSessions(
         getActiveGuacamoleSessions().filter((key) => key !== sessionKey),
     );
     sessionStorage.removeItem(`${TOKEN_KEY_PREFIX}${sessionKey}`);
     window.dispatchEvent(new CustomEvent(GUACAMOLE_SESSION_UPDATED_EVENT));
+    await closeGuacamoleWindow(sessionKey);
 }
