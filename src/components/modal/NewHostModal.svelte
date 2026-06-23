@@ -52,6 +52,7 @@
 
                 if (prefill) {
                     hostname = prefill.targetIp;
+                    port = prefill.port ? String(prefill.port) : "22";
                     username = prefill.username || (account.username ?? "");
                     password = prefill.password || (account.password ?? "");
                     label = prefill.label;
@@ -83,6 +84,7 @@
                 username,
                 password,
                 targetIp: hostname,
+                port: parseInt(port, 10) || 22,
                 bastionIp: bastionIp,
                 label: label || hostname,
                 connectedAt: Date.now(),

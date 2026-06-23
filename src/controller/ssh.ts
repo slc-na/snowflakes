@@ -16,12 +16,21 @@ export async function connectToSession(
         console.log(session.targetIp);
 
         onStatus("Connecting to bastion...");
+
+        console.debug("Connecting to bastion with the following parameters:", {
+            bastion: session.bastionIp,
+            hostname: session.targetIp,
+            port: session.port,
+            initialPassword: session.password,
+            initialUsername: session.username,
+        });
+
         const res = await invoke("start_ssh_session", {
             bastion: session.bastionIp,
             hostname: session.targetIp,
+            port: session.port ?? 22,
             initialPassword: session.password,
             initialUsername: session.username,
-
         });
         const key = res as string;
 
@@ -66,6 +75,7 @@ export async function reconnectToSession(
         const res = await invoke("reconnect_to_session", {
             bastion: session.bastionIp,
             hostname: session.targetIp,
+            port: session.port ?? 22,
             initialPassword: password,
             initialUsername: session.username,
             key: session.sessionKey,

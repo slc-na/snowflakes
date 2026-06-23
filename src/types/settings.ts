@@ -9,6 +9,7 @@ export type SessionInfo = {
     username: string;
     password?: string;
     targetIp: string;
+    port?: number;
     bastionIp: string;
     label: string;
     connectedAt: number;
@@ -20,7 +21,10 @@ export type DefaultAccount = {
 };
 
 export const DEFAULT_SETTINGS: SnowflakesSettings = {
-    bastionIp: "",
-    sshTemplate: "ssh {username}@{bastion_hostname} --target={target_ip} --type={type->[ssh/exec]?} --exec={}",
+    bastionIp: "10.22.77.251",
+    // target = target IP
+    // type = "ssh" or "exec"
+    // exec = custom bash script
+    sshTemplate: "ssh -t {username}@{bastion_hostname} target={target_ip} type={type} exec={}",
     fontSize: 13
 };

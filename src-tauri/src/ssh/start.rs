@@ -15,12 +15,14 @@ pub async fn start_ssh_session(
     bastion: String,
     initial_password: String,
     initial_username: String,
+    port: u16,
 ) -> Result<String, String> {
     let channel = ssh_instance::SshInstance::bastion_session(
         hostname.clone(),
         bastion,
         initial_password,
         initial_username,
+        port,
     )?;
     let mut registry = state.0.lock().unwrap();
     let hostname_clone = hostname.clone();

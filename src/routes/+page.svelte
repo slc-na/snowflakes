@@ -108,6 +108,7 @@
           username: defaults.account.username,
           password: defaults.account.password,
           targetIp: server.ip,
+          port: server.ssh_port,
           bastionIp: defaults.bastionIp,
           label: server.name,
           connectedAt: Date.now(),

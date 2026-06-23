@@ -15,6 +15,7 @@ pub async fn reconnect_to_session(
     bastion: String,
     initial_password: String,
     initial_username: String,
+    port: u16,
 ) -> Result<(), String> {
     let registry = state.0.lock().unwrap();
 
@@ -30,6 +31,7 @@ pub async fn reconnect_to_session(
         bastion,
         initial_password,
         initial_username,
+        port,
     )
     .map_err(|e| e.to_string())?;
 
