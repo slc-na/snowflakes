@@ -3,13 +3,11 @@
 
     let {
         isOpen,
-        mode,
         server,
         onClose,
         onSave,
     } = $props<{
         isOpen: boolean;
-        mode: "ssh" | "sftp";
         server: ServerAttribute | null;
         onClose: () => void;
         onSave: (server: ServerAttribute) => Promise<void>;
@@ -53,7 +51,7 @@
         <div class="modal">
             <div class="modal-header">
                 <span class="modal-title">
-                    Edit {mode === "ssh" ? "SSH" : "SFTP"} connection
+                    Edit SSH & SFTP connection
                 </span>
                 <button class="close-btn" onclick={onClose}>✕</button>
             </div>

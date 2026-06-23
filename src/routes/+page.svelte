@@ -21,7 +21,6 @@
   let errorMsg = $state("");
 
   let editModalOpen = $state(false);
-  let editModalMode = $state<"ssh" | "sftp">("ssh");
   let editModalServer = $state<ServerAttribute | null>(null);
 
   let searchQuery = $state("");
@@ -152,14 +151,6 @@
 
   function handleEditSsh(e: MouseEvent, server: ServerAttribute) {
     e.stopPropagation();
-    editModalMode = "ssh";
-    editModalServer = server;
-    editModalOpen = true;
-  }
-
-  function handleEditSftp(e: MouseEvent, server: ServerAttribute) {
-    e.stopPropagation();
-    editModalMode = "sftp";
     editModalServer = server;
     editModalOpen = true;
   }
@@ -344,16 +335,6 @@
                       <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>
                     </svg>
                   </button>
-                  <button
-                    class="action-btn"
-                    title="Edit SFTP connection"
-                    onclick={(e) => handleEditSftp(e, server)}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>
-                    </svg>
-                  </button>
                 </div>
               </div>
             {/each}
@@ -386,7 +367,6 @@
 
   <EditServerModal
     isOpen={editModalOpen}
-    mode={editModalMode}
     server={editModalServer}
     onClose={() => (editModalOpen = false)}
     onSave={handleSaveServer}
