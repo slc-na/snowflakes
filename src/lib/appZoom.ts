@@ -9,8 +9,20 @@ export function loadAppZoom(): number {
     return Number.isFinite(value) ? value : 1;
 }
 
+// document.documentElement.style.zoom is non-standard and doesn't compose
+// reliably with 100vh layouts / fixed-position elements / overflow scrolling
+// across Chromium/WebView2 - zooming out left a transparent gap (window looked
+// "not fullscreen") and zooming in clipped content instead of scrolling it.
+// transform: scale() on a wrapper sized to 100/zoom% before scaling always
+// paints exactly the real window's area, avoiding both issues.
+const ZOOM_ROOT_ID = "zoom-root";
+
 export function applyAppZoom(zoom: number): void {
-    document.documentElement.style.zoom = String(zoom);
+    const root = document.getElementById(ZOOM_ROOT_ID);
+    if (!root) return;
+    root.style.transform = `scale(${zoom})`;
+    root.style.width = `${100 / zoom}%`;
+    root.style.height = `${100 / zoom}%`;
 }
 
 export function setAppZoom(zoom: number): number {

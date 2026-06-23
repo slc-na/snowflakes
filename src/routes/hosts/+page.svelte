@@ -7,12 +7,9 @@
 
 <style>
     .main-container {
-        width: 100vw;
-        height: 100vh;
+        width: 100%;
+        height: 100%;
         background-color: var(--sf-bg-app);
         display: flex;
-    }
-    :global(body) {
-        overflow: hidden;
     }
 </style>

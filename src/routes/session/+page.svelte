@@ -333,7 +333,7 @@
 
 </script>
 
-<div class="flex flex-col h-screen bg-[#1a1b26]">
+<div class="flex flex-col h-full bg-[#1a1b26]">
     <div
         class="px-4 py-2 bg-[#16161e] border-b border-[#24283b] flex justify-between items-center"
     >

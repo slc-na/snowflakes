@@ -62,7 +62,7 @@
 <style>
     .login-container {
         width: 100%;
-        height: 100vh;
+        height: 100%;
         background-color: var(--sf-bg-app);
         display: flex;
         align-items: center;

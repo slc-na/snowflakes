@@ -241,7 +241,7 @@
   /* ── Layout ──────────────────────────────────────────────── */
   .main-container {
     width: 100%;
-    height: 100vh;
+    height: 100%;
     background-color: var(--sf-bg-app);
     overflow-y: auto;
     display: flex;

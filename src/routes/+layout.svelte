@@ -108,62 +108,75 @@
 	}}
 />
 
-<TitleBar />
+<div id="zoom-root">
+	<TitleBar />
 
-<Toaster
-	toastOptions={{
-		style: 'background: var(--sf-bg-surface); color: var(--sf-text-primary); border: 1px solid var(--sf-border); font-family: var(--sf-font-ui); border-radius: var(--sf-radius-md);',
-		error: {
-			style: 'background: var(--sf-bg-surface); color: var(--sf-status-error); border: 1px solid var(--sf-status-error); font-family: var(--sf-font-ui); border-radius: var(--sf-radius-md);'
-		},
-		success: {
-			style: 'background: var(--sf-bg-surface); color: var(--sf-status-online); border: 1px solid var(--sf-status-online); font-family: var(--sf-font-ui); border-radius: var(--sf-radius-md);'
-		}
-	}}
-/>
+	<Toaster
+		toastOptions={{
+			style: 'background: var(--sf-bg-surface); color: var(--sf-text-primary); border: 1px solid var(--sf-border); font-family: var(--sf-font-ui); border-radius: var(--sf-radius-md);',
+			error: {
+				style: 'background: var(--sf-bg-surface); color: var(--sf-status-error); border: 1px solid var(--sf-status-error); font-family: var(--sf-font-ui); border-radius: var(--sf-radius-md);'
+			},
+			success: {
+				style: 'background: var(--sf-bg-surface); color: var(--sf-status-online); border: 1px solid var(--sf-status-online); font-family: var(--sf-font-ui); border-radius: var(--sf-radius-md);'
+			}
+		}}
+	/>
 
-	<div class="app-parent">
-		<aside class="sidebar-container">
-			<div class="brand-section">
-				<h1 class="brand-title">SNOWFLAKES</h1>
-				<p class="brand-subtitle">SSH MANAGER</p>
-			</div>
+		<div class="app-parent">
+			<aside class="sidebar-container">
+				<div class="brand-section">
+					<h1 class="brand-title">SNOWFLAKES</h1>
+					<p class="brand-subtitle">SSH MANAGER</p>
+				</div>
 
-			<nav class="nav-menu">
-				{#each menus as menu}
-					<SidebarElement
-						text={menu.text}
-						icon={menu.icon}
-						href={menu.href}
-						isActive={$page.url.pathname === menu.href}
-					/>
-				{/each}
-			</nav>
-			
-			<div class="sidebar-spacer"></div>
+				<nav class="nav-menu">
+					{#each menus as menu}
+						<SidebarElement
+							text={menu.text}
+							icon={menu.icon}
+							href={menu.href}
+							isActive={$page.url.pathname === menu.href}
+						/>
+					{/each}
+				</nav>
 
-			<button class="theme-toggle" onclick={toggleTheme}>
-				{#if theme === 'dark'}
-				  <Sun size={16} /> <span class="toggle-text">LIGHT MODE</span>
-				{:else}
-				  <Moon size={16} /> <span class="toggle-text">DARK MODE</span>
+				<div class="sidebar-spacer"></div>
+
+				<button class="theme-toggle" onclick={toggleTheme}>
+					{#if theme === 'dark'}
+					  <Sun size={16} /> <span class="toggle-text">LIGHT MODE</span>
+					{:else}
+					  <Moon size={16} /> <span class="toggle-text">DARK MODE</span>
+					{/if}
+				</button>
+			</aside>
+
+			<div class="app-layout">
+				{#if showTabBar}
+					<SessionTabBar />
 				{/if}
-			</button>
-		</aside>
-
-		<div class="app-layout">
-			{#if showTabBar}
-				<SessionTabBar />
-			{/if}
-			<slot />
+				<slot />
+			</div>
 		</div>
-	</div>
+</div>
 
 <style>
+	:global(html, body) {
+		margin: 0;
+		height: 100%;
+		overflow: hidden;
+	}
+
+	#zoom-root {
+		transform-origin: top left;
+	}
+
 	.app-parent {
 		display: flex;
 		flex-direction: row;
-		height: 100vh;
+		height: 100%;
+		box-sizing: border-box;
 		padding-top: 32px;
 		overflow: hidden;
 	}

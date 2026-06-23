@@ -237,8 +237,8 @@
             >
         </div>
     </div>
-    <!-- svelte-ignore a11y_missing_attribute -->
-    <iframe src="https://moses.apps.slc.net" frameborder="0"></iframe>
+
+    
 </div>
 
 <style>
