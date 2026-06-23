@@ -9,6 +9,7 @@
   import { loadDefaultAccount } from "../controller/vault";
   import { connectToSession } from "../controller/ssh";
   import * as sftp from "../controller/sftp";
+  import { connectToGuacamoleSession } from "../controller/guacamole";
   import type { ServerAttribute } from "../types/servers";
 
   let isModalOpen = $state(false);
@@ -142,6 +143,23 @@
         },
       );
       goto(`/files?key=${encodeURIComponent(key)}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      isConnecting = false;
+    }
+  }
+
+  async function handleQuickGuacamole(e: MouseEvent, server: ServerAttribute) {
+    e.stopPropagation();
+    isConnecting = true;
+    connectingStatus = "Connecting to Guacamole…";
+    errorMsg = "";
+    try {
+      const key = await connectToGuacamoleSession(server, (msg) => {
+        connectingStatus = msg;
+      });
+      goto(`/remote?key=${encodeURIComponent(key)}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
@@ -305,16 +323,31 @@
                 </div>
 
                 <div class="card-actions">
-                  <button
-                    class="action-btn primary"
-                    title="Quick connect via SSH using your Default Account"
-                    onclick={(e) => handleQuickSsh(e, server)}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
-                    </svg>
-                    SSH
-                  </button>
+                  {#if server.os === "windows"}
+                    <button
+                      class="action-btn primary"
+                      title="Quick connect via Guacamole using your Default Account"
+                      onclick={(e) => handleQuickGuacamole(e, server)}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                        <line x1="8" y1="21" x2="16" y2="21" />
+                        <line x1="12" y1="17" x2="12" y2="21" />
+                      </svg>
+                      Guacamole
+                    </button>
+                  {:else}
+                    <button
+                      class="action-btn primary"
+                      title="Quick connect via SSH using your Default Account"
+                      onclick={(e) => handleQuickSsh(e, server)}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+                      </svg>
+                      SSH
+                    </button>
+                  {/if}
                   <button
                     class="action-btn primary"
                     title="Quick connect via SFTP using your Default Account"

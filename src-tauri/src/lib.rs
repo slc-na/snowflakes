@@ -141,7 +141,8 @@ pub fn run() {
             http::shell::get_shell,
             http::shell::update_shell,
             http::shell::insert_shell,
-            http::server::get_bastion_ip
+            http::server::get_bastion_ip,
+            http::guacamole::guacamole_login
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

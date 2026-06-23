@@ -8,7 +8,7 @@
     export let id: string;
     export let label: string = "New Session";
     export let status: SessionStatus = "disconnected";
-    export let kind: "ssh" | "sftp" = "ssh";
+    export let kind: "ssh" | "sftp" | "guacamole" = "ssh";
     export let active: boolean = false;
     export let hasActivity: boolean = false;
 
@@ -139,10 +139,16 @@
     <!-- Tab content -->
     <span class="tab-body">
         <span class="tab-label">
-            <span class="kind-icon" class:kind-sftp={kind === "sftp"} aria-hidden="true">
+            <span class="kind-icon" class:kind-sftp={kind === "sftp"} class:kind-guacamole={kind === "guacamole"} aria-hidden="true">
                 {#if kind === "sftp"}
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                    </svg>
+                {:else if kind === "guacamole"}
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                        <line x1="8" y1="21" x2="16" y2="21" />
+                        <line x1="12" y1="17" x2="12" y2="21" />
                     </svg>
                 {:else}
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -296,6 +302,10 @@
 
     .kind-icon.kind-sftp {
         color: var(--sf-accent, #4fc3f7);
+    }
+
+    .kind-icon.kind-guacamole {
+        color: #a78bfa;
     }
 
     .activity-dot {

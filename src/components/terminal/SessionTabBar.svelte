@@ -7,12 +7,17 @@
     import { page } from "$app/state";
     import { connectToSession, deleteSession } from "../../controller/ssh";
     import { disconnectSftp } from "../../controller/sftp";
+    import {
+        getActiveGuacamoleSessions,
+        disconnectGuacamoleSession,
+        GUACAMOLE_SESSION_UPDATED_EVENT,
+    } from "../../controller/guacamole";
     import ErrorModal from "../modal/ErrorModal.svelte";
     import { loadSessionInfo } from "../../controller/local";
     import { loadSessionPass } from "../../controller/vault";
 
     type SessionStatus = "connected" | "connecting" | "disconnected" | "error";
-    type SessionKind = "ssh" | "sftp";
+    type SessionKind = "ssh" | "sftp" | "guacamole";
 
     type Session = {
         id: string;
@@ -46,9 +51,10 @@
                 invoke<string[]>("get_active_session"),
                 invoke<string[]>("get_active_sftp_session").catch(() => []),
             ]);
+            const guacamoleKeys = getActiveGuacamoleSessions();
 
             const existingIds = new Set(sessions.map((s) => s.id));
-            const newIds = new Set([...sshKeys, ...sftpKeys]);
+            const newIds = new Set([...sshKeys, ...sftpKeys, ...guacamoleKeys]);
 
             for (const key of sshKeys) {
                 if (!existingIds.has(key)) {
@@ -80,6 +86,21 @@
                 }
             }
 
+            for (const key of guacamoleKeys) {
+                if (!existingIds.has(key)) {
+                    sessions = [
+                        ...sessions,
+                        {
+                            id: key,
+                            label: key,
+                            status: "connected",
+                            hasActivity: false,
+                            kind: "guacamole",
+                        },
+                    ];
+                }
+            }
+
             sessions = sessions.filter((s) => newIds.has(s.id));
         } catch (err) {
             console.error("[SessionTabBar] fetchSessions error:", err);
@@ -99,12 +120,18 @@
         unlistenSftpSessionUpdated = await listen("sftp_session_updated", () => {
             fetchSessions();
         });
+        window.addEventListener(GUACAMOLE_SESSION_UPDATED_EVENT, handleGuacamoleSessionUpdated);
     });
 
     onDestroy(() => {
         if (unlistenSessionUpdated) unlistenSessionUpdated();
         if (unlistenSftpSessionUpdated) unlistenSftpSessionUpdated();
+        window.removeEventListener(GUACAMOLE_SESSION_UPDATED_EVENT, handleGuacamoleSessionUpdated);
     });
+
+    function handleGuacamoleSessionUpdated(): void {
+        fetchSessions();
+    }
 
     function selectSession(id: string): void {
         const session = sessions.find((s) => s.id === id);
@@ -112,6 +139,8 @@
         tick().then(() => scrollTabIntoView(id));
         if (session?.kind === "sftp") {
             goto(`/files?key=${encodeURIComponent(id)}`);
+        } else if (session?.kind === "guacamole") {
+            goto(`/remote?key=${encodeURIComponent(id)}`);
         } else {
             goto(`/session?key=${encodeURIComponent(id)}`);
         }
@@ -119,8 +148,8 @@
 
     async function duplicateSession(id: string): Promise<void> {
         const session = sessions.find((s) => s.id === id);
-        if (session?.kind === "sftp") {
-            // SFTP sessions don't have a duplicate flow yet
+        if (session?.kind === "sftp" || session?.kind === "guacamole") {
+            // SFTP and Guacamole sessions don't have a duplicate flow yet
             return;
         }
 
@@ -156,6 +185,8 @@
         try {
             if (session?.kind === "sftp") {
                 await disconnectSftp(id);
+            } else if (session?.kind === "guacamole") {
+                disconnectGuacamoleSession(id);
             } else {
                 await deleteSession(id);
             }

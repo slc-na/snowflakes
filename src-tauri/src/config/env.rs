@@ -35,3 +35,7 @@ pub fn load_backend_url() -> String {
 pub fn load_bastion_ip() -> String {
     dotenv!("BASTION_IP").to_string()
 }
+
+pub fn load_guacamole_url() -> String {
+    dotenv!("GUACAMOLE_URL").to_string()
+}
