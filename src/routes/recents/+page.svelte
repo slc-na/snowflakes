@@ -239,6 +239,14 @@
 
 <style>
   /* ── Layout ──────────────────────────────────────────────── */
+  main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   .main-container {
     width: 100%;
     height: 100%;
