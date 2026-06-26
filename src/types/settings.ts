@@ -25,6 +25,6 @@ export const DEFAULT_SETTINGS: SnowflakesSettings = {
     // target = target IP
     // type = "ssh" or "exec"
     // exec = custom bash script
-    sshTemplate: "ssh -t {username}@{bastion_hostname} target={target_ip} type={type} exec={}",
+    sshTemplate: "ssh -t {username}@{bastion_ip} target={target} port={port}",
     fontSize: 13
 };

@@ -92,6 +92,7 @@ impl SshEngine {
                 }
             }
 
+            
             println!("Thread Exited, Cleaning up session");
         });
     }

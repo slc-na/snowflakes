@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use tauri::Emitter;
 use tokio::sync::{mpsc, watch};
 use uuid::Uuid;
@@ -15,14 +16,13 @@ pub async fn start_ssh_session(
     bastion: String,
     initial_password: String,
     initial_username: String,
-    port: u16,
+    params: HashMap<String, String>,
 ) -> Result<String, String> {
-    let channel = ssh_instance::SshInstance::bastion_session(
-        hostname.clone(),
+    let (channel, early_output) = ssh_instance::SshInstance::bastion_session(
         bastion,
         initial_password,
         initial_username,
-        port,
+        params,
     )?;
     let mut registry = state.0.lock().unwrap();
     let hostname_clone = hostname.clone();
@@ -34,11 +34,17 @@ pub async fn start_ssh_session(
         hostname_clone.clone().replace(".", "-"),
         Uuid::new_v4().to_string()
     );
-    registry.insert(session_key.clone(), SshInstance { 
-        tx : tx, 
+    registry.insert(session_key.clone(), SshInstance {
+        tx : tx,
         stop_tx : stop_tx
     });
     let _ = window.emit("session_updated", session_key.clone());
+    if !early_output.is_empty() {
+        let _ = window.emit(
+            &format!("ssh-output-{}", session_key),
+            String::from_utf8_lossy(&early_output).to_string(),
+        );
+    }
     let window_clone = window.clone();
     SshEngine::spawn_thread_write(rx, channel, stop_rx.clone());
     SshEngine::spawn_thread_read(session_key.clone(), reader, window_clone, stop_rx.clone());
