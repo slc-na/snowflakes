@@ -38,6 +38,7 @@
     let term : Terminal = $state(new Terminal());
     let fitAddon : FitAddon;
     let cleanupSsh : () => void;
+    let resizeObserver: ResizeObserver;
 
 
     function handleResize() {
@@ -82,26 +83,6 @@
     };
 
 
-    function handleScroll(e : WheelEvent){
-        if(!e.ctrlKey){
-            return
-        }
-        
-        // if scroll up > resize up
-        e.preventDefault();
-        let increment = 0;
-
-        if(e.deltaY > 0){
-            increment = -1
-        }else{
-            increment = 1
-        }
-
-        incrementTerminalFont(term, fitAddon, increment)
-        // if scroll down > resize down
-    }
-
-
     function setupTerminal(){
         term = new Terminal({
             theme: {
@@ -124,7 +105,12 @@
         loadSettings().then(setting=>{
             setTerminalFont(term!, fitAddon, setting.fontSize)  
         })
-        
+
+        resizeObserver = new ResizeObserver(() => {
+            // rAF avoids "ResizeObserver loop limit exceeded" and ensures layout has settled
+            requestAnimationFrame(() => fitAddon.fit());
+        });
+        resizeObserver.observe(terminalElement);
 
         serializeAddon = new SerializeAddon();
         term.loadAddon(serializeAddon);
@@ -271,13 +257,11 @@
 
 
         window.addEventListener("resize", handleResize);
-        window.addEventListener("wheel", handleScroll);
         window.addEventListener("keydown", handleGlobalEscape);
     }
 
     function removeWindowEventListeners(){
         window.removeEventListener("resize", handleResize);
-        window.removeEventListener("wheel", handleScroll);
         window.removeEventListener("keydown", handleGlobalEscape);
     }
 
@@ -326,6 +310,7 @@
         console.debug(`ID : ${session?.sessionKey}, page destroyed (OnDestroy)`)
         teardownSsh()
         removeWindowEventListeners();
+        resizeObserver?.disconnect();
         term.dispose();
     });
 
@@ -359,11 +344,15 @@
         </button>
     </div>
 
-    <div class="flex-1 p-2">
-        <div
-            bind:this={terminalElement}
-            class="h-[calc(100%-32px)] w-full"
-        ></div>
+    <div class="flex-1 min-h-0 p-2">
+         <div class="h-full w-full pb-10 min-h-0">
+        <!-- inner: this is what xterm actually measures and renders into -->
+            <div
+                bind:this={terminalElement}
+                class="h-full w-full"
+            >
+            </div>
+        </div>
     </div>
     <ErrorModal
         isOpen={isOpenerrorMessage}

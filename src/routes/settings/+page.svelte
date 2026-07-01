@@ -19,11 +19,10 @@
     let sshTemplate = $state(DEFAULT_SETTINGS.sshTemplate);
     let fontSize = $state(13);
 
-    let fontSizeOptions = $state(Array(40).keys().map(size => size + 6))
+    let fontSizeOptions = $state(Array(30).keys().map(size => size + 8))
 
     let accountUsername = $state("");
     let accountPassword = $state("");
-    let showAccountPassword = $state(false);
 
     let statusMessage = $state("");
 
@@ -189,18 +188,10 @@
                         <div class="input-wrap">
                             <input
                                 id="acct-password"
-                                type={showAccountPassword ? "text" : "password"}
+                                type="password"
                                 placeholder="••••••••"
                                 bind:value={accountPassword}
                             />
-                            <button
-                                class="eye-btn"
-                                onclick={() =>
-                                    (showAccountPassword =
-                                        !showAccountPassword)}
-                            >
-                                {showAccountPassword ? "hide" : "show"}
-                            </button>
                         </div>
                     </div>
                 </div>

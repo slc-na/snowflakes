@@ -202,7 +202,7 @@
 
     input,
     select {
-        background: var(--sf-bg-secondary);
+        background: var(--sf-bg-input);
         border: 1px solid var(--sf-border);
         border-radius: 7px;
         padding: 8px 10px;
@@ -212,6 +212,17 @@
         width: 100%;
         font-family: var(--sf-font-ui);
         box-sizing: border-box;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 28px;
+    }
+    
+    select{
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     }
 
     input:focus,
