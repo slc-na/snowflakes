@@ -86,6 +86,7 @@ jobs:
           echo "OAUTH_URL=${{ vars.OAUTH_URL }}" >> .env
           echo "BACKEND_URL=${{ vars.BACKEND_URL }}" >> .env
           echo "BASTION_IP=${{ vars.BASTION_IP }}" >> .env
+          echo "GUACAMOLE_URL=${{ vars.GUACAMOLE_URL }}" >> .env
       
       - uses: tauri-apps/tauri-action@action-v0.6.1
 
