@@ -21,7 +21,7 @@ export type DefaultAccount = {
 };
 
 export const DEFAULT_SETTINGS: SnowflakesSettings = {
-    bastionIp: "10.22.77.251",
+    bastionIp: "10.22.77.248",
     // target = target IP
     // type = "ssh" or "exec"
     // exec = custom bash script
