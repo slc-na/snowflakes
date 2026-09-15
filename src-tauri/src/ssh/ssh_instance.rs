@@ -11,8 +11,13 @@ use tokio::sync::{mpsc, watch};
 const FAST_EXIT_GRACE: Duration = Duration::from_millis(1500);
 const FAST_EXIT_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
+pub enum ChannelMessage {
+    Input(String),
+    Resize { cols: u32, rows: u32 },
+}
+
 pub struct SshInstance {
-    pub tx: mpsc::UnboundedSender<String>,
+    pub tx: mpsc::UnboundedSender<ChannelMessage>,
     pub stop_tx: watch::Sender<bool>
 }
 

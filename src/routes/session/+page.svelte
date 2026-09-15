@@ -180,6 +180,24 @@
             errorMessage = event.payload as string;
         });
 
+        // forward xterm size changes to the remote pty so curses apps like
+        // nano know the real viewport height and can scroll long documents
+        let detachTermOnResize = term.onResize(({ cols, rows }) => {
+            invoke("resize_ssh_pty", { cols, rows, ip: key }).catch((e) =>
+                console.debug("resize_ssh_pty failed", e),
+            );
+        });
+
+        // the pty was created with the host terminal size (or a fallback)
+        // before this page mounted, so push the real xterm size once here
+        if (term.cols > 0 && term.rows > 0) {
+            invoke("resize_ssh_pty", {
+                cols: term.cols,
+                rows: term.rows,
+                ip: key,
+            }).catch((e) => console.debug("resize_ssh_pty failed", e));
+        }
+
         let inputBuffer = "";
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -221,6 +239,7 @@
             console.debug(`Session : ${session?.sessionKey} : SSH cleaned up`)
             detachTermOnData.dispose(); //lepasin onData
             detachTermOnSelection.dispose() //lepasin onSelect
+            detachTermOnResize.dispose() //lepasin onResize
             if (debounceTimer) clearTimeout(debounceTimer);
         };
 

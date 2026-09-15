@@ -4,7 +4,7 @@ use tokio::sync::{mpsc, watch};
 
 use crate::ssh::{
     ssh_engine::SshEngine,
-    ssh_instance::{self, SshInstance},
+    ssh_instance::{self, ChannelMessage, SshInstance},
 };
 
 #[tauri::command]
@@ -37,7 +37,7 @@ pub async fn reconnect_to_session(
 
     let reader = channel.stream(0);
 
-    let (tx, rx) = mpsc::unbounded_channel::<String>();
+    let (tx, rx) = mpsc::unbounded_channel::<ChannelMessage>();
     let (stop_tx, stop_rx) = watch::channel(false);
 
     let mut registry = state.0.lock().unwrap();

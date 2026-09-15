@@ -1,4 +1,4 @@
-use crate::ssh::ssh_instance::SshInstance;
+use crate::ssh::ssh_instance::{ChannelMessage, SshInstance};
 use ssh2::{Channel, Stream};
 use std::io::Read;
 use std::io::Write;
@@ -17,22 +17,31 @@ pub struct SshEngine(pub Arc<Mutex<HashMap<String, SshInstance>>>);
 
 impl SshEngine {
     pub fn spawn_thread_write(
-        rx: UnboundedReceiver<String>,
+        rx: UnboundedReceiver<ChannelMessage>,
         channel: Channel,
         stop_rx: watch::Receiver<bool>,
     ) {
         tauri::async_runtime::spawn_blocking(move || {
             let mut rx_mut = rx;
             let mut channel_mut = channel;
-            while let Some(input) = rx_mut.blocking_recv() {
+            while let Some(message) = rx_mut.blocking_recv() {
                 if *stop_rx.borrow() {
                     break;
                 }
-                if channel_mut.write_all(input.as_bytes()).is_err() {
-                    break;
-                }
-                if channel_mut.flush().is_err() {
-                    break;
+                match message {
+                    ChannelMessage::Input(input) => {
+                        if channel_mut.write_all(input.as_bytes()).is_err() {
+                            break;
+                        }
+                        if channel_mut.flush().is_err() {
+                            break;
+                        }
+                    }
+                    ChannelMessage::Resize { cols, rows } => {
+                        if let Err(e) = channel_mut.request_pty_size(cols, rows, None, None) {
+                            println!("Failed to resize pty to {}x{}: {}", cols, rows, e);
+                        }
+                    }
                 }
             }
             println!("Writer thread exited");

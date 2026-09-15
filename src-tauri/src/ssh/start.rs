@@ -4,7 +4,10 @@ use tokio::sync::{mpsc, watch};
 use uuid::Uuid;
 
 use crate::ssh::ssh_instance;
-use crate::ssh::{ssh_engine::SshEngine, ssh_instance::SshInstance};
+use crate::ssh::{
+    ssh_engine::SshEngine,
+    ssh_instance::{ChannelMessage, SshInstance},
+};
 
 
 // works untuk duplicate juga
@@ -27,7 +30,7 @@ pub async fn start_ssh_session(
     let mut registry = state.0.lock().unwrap();
     let hostname_clone = hostname.clone();
     let reader = channel.stream(0);
-    let (tx, rx) = mpsc::unbounded_channel::<String>();
+    let (tx, rx) = mpsc::unbounded_channel::<ChannelMessage>();
     let (stop_tx, stop_rx) = watch::channel(false);
     let session_key = format!(
         "{}_{}",

@@ -8,6 +8,7 @@ use ssh::input::send_ssh_input;
 use ssh::manage_session::disconnect;
 use ssh::manage_session::get_active_session;
 use ssh::reconnect::reconnect_to_session;
+use ssh::resize::resize_ssh_pty;
 use ssh::start::start_ssh_session;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -121,6 +122,7 @@ pub fn run() {
             get_system_stats,
             start_ssh_session,
             send_ssh_input,
+            resize_ssh_pty,
             disconnect,
             get_active_session,
             reconnect_to_session,
