@@ -26,8 +26,8 @@
     let session = $state<SessionInfo | null>(null);
     let terminalElement: HTMLElement;
 
-    let unlisten: UnlistenFn;
-    let unlistenError: UnlistenFn;
+    let unlisten: UnlistenFn | undefined;
+    let unlistenError: UnlistenFn | undefined;
     let isOpenerrorMessage = $state(false);
     let errorMessage = $state("");
 
@@ -35,6 +35,35 @@
     let serializeAddon = $state<SerializeAddon | null>(null);
     let term: Terminal | null = null;
     let fitAddon: FitAddon | null = null;
+
+    // Monotonic token identifying the "current" session in this pane. Any async
+    // work started for an older token is stale and must not touch the terminal.
+    let setupGeneration = 0;
+    let cleanupPaneSession: (() => void) | null = null;
+
+    // Dispose listeners/callbacks belonging to the currently attached session.
+    // Called before (re)assigning a session and when the pane unmounts.
+    function disposePaneSession(): void {
+        if (unlisten) {
+            unlisten();
+            unlisten = undefined;
+        }
+        if (unlistenError) {
+            unlistenError();
+            unlistenError = undefined;
+        }
+        if (cleanupPaneSession) {
+            cleanupPaneSession();
+            cleanupPaneSession = null;
+        }
+    }
+
+    // xterm parses writes asynchronously (chunked across event-loop ticks) and
+    // reset() does not cancel already-queued data. Writing an empty chunk with a
+    // callback queues a barrier that fires once everything pending is parsed.
+    function drainPaneWrites(target: Terminal): Promise<void> {
+        return new Promise((resolve) => target.write("", () => resolve()));
+    }
 
     onMount(() => {
         term = new Terminal({
@@ -64,12 +93,20 @@
             if (term && fitAddon) setTerminalFont(term, fitAddon, setting.fontSize);
         });
 
-        const setupSsh = async (key: string) => {
+        const setupSsh = async (key: string, generation: number) => {
+            const activeTerm = term;
+            const activeFitAddon = fitAddon;
+            if (!activeTerm || !activeFitAddon) return;
+
+            const isCurrent = () =>
+                generation === setupGeneration && key === currentSshKey;
+
             isLoading = true;
             connectingStatus = "Initializing connection...";
             const currentSession = await loadSessionInfo(key);
+            if (!isCurrent()) return;
             if (!currentSession) {
-                term?.writeln(
+                activeTerm.writeln(
                     `\r\n\x1b[31mError: Session info not found for key: ${key}\x1b[0m`,
                 );
                 isLoading = false;
@@ -80,45 +117,83 @@
             const eventName = `ssh-output-${key}`;
 
             await reconnectToSession(session, (msg) => {
+                if (!isCurrent()) return;
                 connectingStatus = msg;
             });
-            
+            if (!isCurrent()) return;
+
             isLoading = false;
-            
+
             const previousState = loadTerminalState(key);
             if (previousState) {
-                term?.write(previousState);
+                activeTerm.write(previousState);
             } else {
-                term?.writeln("");
-                term?.writeln("========================================");
-                term?.writeln("          SSH CONNECTION INFO          ");
-                term?.writeln("----------------------------------------");
-                term?.writeln(` Session Key  : ${key}`);
-                term?.writeln(` Bastion Host : ${currentSession.bastionIp}`);
-                term?.writeln(` Username     : ${currentSession.username}`);
-                term?.writeln(` Target Host  : ${currentSession.targetIp}`);
-                term?.writeln(` Time         : ${now}`);
-                term?.writeln("----------------------------------------");
-                term?.writeln(` Press Enter to continue`);
-                term?.writeln("========================================");
-                term?.writeln("");
+                activeTerm.writeln("");
+                activeTerm.writeln("========================================");
+                activeTerm.writeln("          SSH CONNECTION INFO          ");
+                activeTerm.writeln("----------------------------------------");
+                activeTerm.writeln(` Session Key  : ${key}`);
+                activeTerm.writeln(` Bastion Host : ${currentSession.bastionIp}`);
+                activeTerm.writeln(` Username     : ${currentSession.username}`);
+                activeTerm.writeln(` Target Host  : ${currentSession.targetIp}`);
+                activeTerm.writeln(` Time         : ${now}`);
+                activeTerm.writeln("----------------------------------------");
+                activeTerm.writeln(` Press Enter to continue`);
+                activeTerm.writeln("========================================");
+                activeTerm.writeln("");
             }
 
-            unlisten = await listen(eventName, (event) => {
-                term?.write(event.payload as string);
+            const localUnlisten = await listen(eventName, (event) => {
+                if (!isCurrent()) return;
+                activeTerm.write(event.payload as string);
             });
+            if (!isCurrent()) {
+                localUnlisten();
+                return;
+            }
+            unlisten = localUnlisten;
 
             const errorEventName = `ssh-error-output-${key}`;
 
-            unlistenError = await listen(errorEventName, (event) => {
+            const localUnlistenError = await listen(errorEventName, (event) => {
+                if (!isCurrent()) return;
                 isOpenerrorMessage = true;
                 errorMessage = event.payload as string;
             });
+            if (!isCurrent()) {
+                localUnlisten();
+                localUnlistenError();
+                unlisten = undefined;
+                return;
+            }
+            unlistenError = localUnlistenError;
+
+            // forward xterm size changes to the remote pty so curses apps like
+            // nano fill the split pane instead of the size the pty was born with
+            const detachTermOnResize = activeTerm.onResize(({ cols, rows }) => {
+                if (!isCurrent()) return;
+                invoke("resize_ssh_pty", { cols, rows, ip: key }).catch((e) =>
+                    console.debug("resize_ssh_pty failed", e),
+                );
+            });
+
+            // the pty was created with the host/fallback size before this pane
+            // existed, so push the real xterm size once here
+            activeFitAddon.fit();
+            if (activeTerm.cols > 0 && activeTerm.rows > 0) {
+                invoke("resize_ssh_pty", {
+                    cols: activeTerm.cols,
+                    rows: activeTerm.rows,
+                    ip: key,
+                }).catch((e) => console.debug("resize_ssh_pty failed", e));
+            }
 
             let inputBuffer = "";
             let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-            term?.onData((data: string) => {
+            const detachTermOnData = activeTerm.onData((data: string) => {
+                if (!isCurrent()) return;
+
                 inputBuffer += data;
 
                 if (debounceTimer) return;
@@ -128,18 +203,26 @@
                     inputBuffer = "";
                     debounceTimer = null;
 
+                    if (!isCurrent()) return;
+
                     invoke("send_ssh_input", {
                         input: payload,
                         ip: key,
                     });
                 }, 70);
             });
+
+            cleanupPaneSession = () => {
+                detachTermOnData.dispose();
+                detachTermOnResize.dispose();
+                if (debounceTimer) clearTimeout(debounceTimer);
+            };
         };
 
         const handleResize = () => {
-            setTimeout(() => {
-                if (fitAddon) fitAddon.fit();
-            }, 50);
+            // rAF lets the CSS grid/layout settle before FitAddon measures, and
+            // avoids "ResizeObserver loop limit exceeded" while the pane reflows
+            requestAnimationFrame(() => fitAddon?.fit());
         };
 
         const customKeyHandler = (e: KeyboardEvent) => {
@@ -172,16 +255,28 @@
 
         $effect(() => {
             if (targetKey !== currentSshKey) {
-                if (targetKey && targetKey !== "unknown") {
-                    if (unlisten) unlisten();
-                    if (unlistenError) unlistenError();
+                // invalidate any in-flight setup for the previous session first
+                setupGeneration += 1;
+                const generation = setupGeneration;
+                const activeTerm = term;
+                disposePaneSession();
 
-                    term?.clear();
-                    currentSshKey = targetKey;
-                    setupSsh(targetKey);
-                } else {
-                    currentSshKey = "unknown";
-                }
+                if (!activeTerm) return;
+
+                // xterm parses writes asynchronously and reset() does not cancel
+                // already-queued data, so drain before handing the terminal to
+                // another session or its output would bleed into the new one
+                void drainPaneWrites(activeTerm).then(() => {
+                    if (generation !== setupGeneration) return;
+
+                    if (targetKey && targetKey !== "unknown") {
+                        activeTerm.reset();
+                        currentSshKey = targetKey;
+                        setupSsh(targetKey, generation);
+                    } else {
+                        currentSshKey = "unknown";
+                    }
+                });
             }
         });
 
@@ -192,6 +287,7 @@
         const resizeObserver = new ResizeObserver(() => {
             handleResize();
         });
+        resizeObserver.observe(terminalElement);
         if (terminalElement.parentElement) {
             resizeObserver.observe(terminalElement.parentElement);
         }
@@ -206,10 +302,10 @@
             ) {
                 saveTerminalState(currentSshKey, serializeAddon.serialize());
             }
+            setupGeneration += 1;
+            disposePaneSession();
             window.removeEventListener("resize", handleResize);
             resizeObserver.disconnect();
-            if (unlisten) unlisten();
-            if (unlistenError) unlistenError();
             if (term) term.dispose();
         };
     });

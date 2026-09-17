@@ -27,18 +27,33 @@
     let session = $state<SessionInfo | null>(null);
     let terminalElement: HTMLElement;
 
-    let unlisten: UnlistenFn;
-    let unlistenError: UnlistenFn;
+    let unlisten: UnlistenFn | undefined;
+    let unlistenError: UnlistenFn | undefined;
     let isOpenerrorMessage = $state(false);
     let errorMessage = $state("");
 
     let currentSshKey = $state<string | null>(null);
     let serializeAddon = $state<SerializeAddon | null>(null);
-        
+
     let term : Terminal = $state(new Terminal());
     let fitAddon : FitAddon;
-    let cleanupSsh : () => void;
+    let cleanupSsh : (() => void) | undefined;
     let resizeObserver: ResizeObserver;
+
+    // Monotonic token identifying the "current" tab setup. Any async work started
+    // for an older token is stale and must not write to / attach listeners on the
+    // shared terminal of the newly selected tab.
+    let sessionGeneration = 0;
+
+
+    // xterm parses writes asynchronously (chunked across several event-loop ticks).
+    // `clear()`/`reset()` do NOT cancel data that is already queued, so the tail of
+    // the previous tab's output/scrollback-restore would otherwise keep rendering
+    // after the terminal has been handed to the next tab. Writing an empty chunk
+    // with a callback queues a barrier that fires once everything pending is parsed.
+    function drainTerminalWrites(target: Terminal): Promise<void> {
+        return new Promise((resolve) => target.write("", () => resolve()));
+    }
 
 
     function handleResize() {
@@ -121,19 +136,37 @@
     }
 
 
-    async function setupSsh(key : string){
-
-        console.debug(`Setup SSH called for key : ${key}`)
-
-
-        // cleanup ssh connection yang tab sebelumnya dlu
-        // klo gaada ini, connectionnya ttp persists ketika user pindah tab
-        if(cleanupSsh){
-            console.debug("Cleaning up ssh")
-            cleanupSsh()
+    // Dispose listeners/callbacks belonging to the currently attached session.
+    // Always called before switching tabs so a stale `ssh-output` listener can
+    // never write the previous tab's output into the newly selected tab.
+    function disposeActiveSession(){
+        if (unlisten) {
+            unlisten();
+            unlisten = undefined;
         }
+        if (unlistenError) {
+            unlistenError();
+            unlistenError = undefined;
+        }
+        if (cleanupSsh) {
+            cleanupSsh();
+            cleanupSsh = undefined;
+        }
+    }
+
+
+    async function setupSsh(key : string, generation : number){
+
+        const isCurrent = () =>
+            generation === sessionGeneration && key === currentSshKey;
+
+        console.debug(`Setup SSH called for key : ${key} (generation ${generation})`)
 
         const currentSession = await loadSessionInfo(key);
+        if (!isCurrent()) {
+            console.debug(`SSH setup for ${key} aborted (stale generation)`)
+            return;
+        }
         if (!currentSession) {
             term.writeln(
                 `\r\n\x1b[31mError: Session info not found for key: ${key}\x1b[0m`,
@@ -166,23 +199,40 @@
 
 
         // listen to tauri emitted event
-        unlisten = await listen(eventName, (event) => {
+        const localUnlisten = await listen(eventName, (event) => {
+            // a listener left over from a previously selected tab must never
+            // write into the terminal that currently shows another session
+            if (!isCurrent()) return;
 
             // console.debug("user typed : " + event.payload)
 
             term.write(event.payload as string);
         });
+        if (!isCurrent()) {
+            localUnlisten();
+            return;
+        }
+        unlisten = localUnlisten;
 
         const errorEventName = `ssh-error-output-${key}`;
 
-        unlistenError = await listen(errorEventName, (event) => {
+        const localUnlistenError = await listen(errorEventName, (event) => {
+            if (!isCurrent()) return;
             isOpenerrorMessage = true;
             errorMessage = event.payload as string;
         });
+        if (!isCurrent()) {
+            localUnlisten();
+            localUnlistenError();
+            unlisten = undefined;
+            return;
+        }
+        unlistenError = localUnlistenError;
 
         // forward xterm size changes to the remote pty so curses apps like
         // nano know the real viewport height and can scroll long documents
-        let detachTermOnResize = term.onResize(({ cols, rows }) => {
+        const detachTermOnResize = term.onResize(({ cols, rows }) => {
+            if (!isCurrent()) return;
             invoke("resize_ssh_pty", { cols, rows, ip: key }).catch((e) =>
                 console.debug("resize_ssh_pty failed", e),
             );
@@ -201,10 +251,9 @@
         let inputBuffer = "";
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+        const detachTermOnData = term.onData((data: string) => {
+            if (!isCurrent()) return;
 
-
-    
-        let detachTermOnData = term.onData((data: string) => {
             inputBuffer += data;
 
             if (debounceTimer) return;
@@ -213,6 +262,8 @@
                 const payload = inputBuffer;
                 inputBuffer = "";
                 debounceTimer = null;
+
+                if (!isCurrent()) return;
 
                 console.debug(`Sending string : ${payload}`)
 
@@ -225,7 +276,8 @@
 
 
         // copy selection by mouse selection (kyk putty)
-        let detachTermOnSelection =  term.onSelectionChange(() => {
+        const detachTermOnSelection =  term.onSelectionChange(() => {
+            if (!isCurrent()) return;
             const selection = term.getSelection();
             if (selection) {
                 navigator.clipboard.writeText(selection);
@@ -236,7 +288,7 @@
         term.attachCustomKeyEventHandler(handleKeyDown);
 
         cleanupSsh = function(){
-            console.debug(`Session : ${session?.sessionKey} : SSH cleaned up`)
+            console.debug(`Session : ${key} : SSH cleaned up`)
             detachTermOnData.dispose(); //lepasin onData
             detachTermOnSelection.dispose() //lepasin onSelect
             detachTermOnResize.dispose() //lepasin onResize
@@ -248,6 +300,9 @@
 
 
     function teardownSsh(){
+        // cancel any in-flight setupSsh before tearing the page down
+        sessionGeneration += 1;
+
         if (
             currentSshKey &&
             currentSshKey !== "unknown" &&
@@ -257,8 +312,7 @@
             console.debug(`Teardown ssh called on ${currentSshKey}`)
             saveTerminalState(currentSshKey, serializeAddon.serialize());
         }
-        if (unlisten) unlisten();
-        if (unlistenError) unlistenError();
+        disposeActiveSession();
     }
 
     // klo escape kepencet pas terminal lagi gak focus (uda di-blur sebelumnya),
@@ -295,24 +349,38 @@
         // klo newKey (yg di params) beda dgn yg current, init koneksi baru
         if (targetKey !== currentSshKey) {
 
-            if(currentSshKey && serializeAddon){
-                // apabila skrg uda buka tab, lalu mau pindah tab, kita savve dlu state skrg
-                saveTerminalState(currentSshKey, serializeAddon.serialize())
-            }
+            // invalidate any in-flight setupSsh from the previous tab first, so
+            // its async continuation can't write into the terminal after switch
+            sessionGeneration += 1;
+            const generation = sessionGeneration;
+            const outgoingKey = currentSshKey;
 
-            if (targetKey && targetKey !== "unknown") {
-                console.debug("SSH Key changed or initialized:", targetKey);
+            // stop the outgoing session from queueing new output before we drain
+            disposeActiveSession();
 
-                // cleanup listener lama
-                if (unlisten) unlisten();
-                if (unlistenError) unlistenError();
+            // Only after xterm has parsed every byte already queued is it safe to
+            // reuse the terminal: without this, the tail of the previous tab's
+            // output/restore renders into the newly selected tab.
+            void drainTerminalWrites(term).then(() => {
+                if (generation !== sessionGeneration) return;
 
-                term.clear();
-                currentSshKey = targetKey;
-                setupSsh(targetKey);
-            } else {
-                currentSshKey = "unknown";
-            }
+                if (outgoingKey && outgoingKey !== "unknown" && serializeAddon) {
+                    // apabila skrg uda buka tab, lalu mau pindah tab, kita savve dlu state skrg
+                    saveTerminalState(outgoingKey, serializeAddon.serialize())
+                }
+
+                if (targetKey && targetKey !== "unknown") {
+                    console.debug("SSH Key changed or initialized:", targetKey);
+
+                    // reset (not clear) so buffered lines, scrollback and terminal
+                    // modes set by the previous session can't leak into this one
+                    term.reset();
+                    currentSshKey = targetKey;
+                    setupSsh(targetKey, generation);
+                } else {
+                    currentSshKey = "unknown";
+                }
+            });
         }
     });
 
