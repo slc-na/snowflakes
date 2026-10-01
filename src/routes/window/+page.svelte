@@ -60,9 +60,12 @@
         const saved = loadSavedWindowState();
         if (saved) {
             if (saved.layout) layout = saved.layout;
+            const seen = new Set<string>();
             saved.paneKeys.forEach((key, i) => {
-                if (panes[i] && key && activeKeys.has(key)) {
+                // first pane wins, so a duplicate saved by an older build is dropped
+                if (panes[i] && key && activeKeys.has(key) && !seen.has(key)) {
                     panes[i].sessionKey = key;
+                    seen.add(key);
                 }
             });
         }
@@ -85,6 +88,29 @@
         panes.slice(0, activeLayout.cols * activeLayout.rows),
     );
 
+    // Keys already claimed by a pane that is currently on screen. One key can only
+    // back one pane: two panes on the same session share a single pty, so input
+    // typed in one gets executed in both.
+    let usedKeys = $derived(
+        new Set(activePanes.map((p) => p.sessionKey).filter((k) => k !== null)),
+    );
+    let availableSessions = $derived(
+        sessions.filter((s) => !usedKeys.has(s.sessionKey)),
+    );
+
+    // Keep only the first pane claiming a key (panes are ordered, active ones first).
+    function dedupePanes(): void {
+        const seen = new Set<string>();
+        for (const pane of panes) {
+            if (!pane.sessionKey) continue;
+            if (seen.has(pane.sessionKey)) {
+                pane.sessionKey = null;
+            } else {
+                seen.add(pane.sessionKey);
+            }
+        }
+    }
+
     function assignSession(paneId: number, e: Event) {
         const select = e.target as HTMLSelectElement;
         panes[paneId].sessionKey = select.value === "" ? null : select.value;
@@ -98,6 +124,9 @@
 
     function selectLayout(id: string) {
         layout = id;
+        // a smaller layout can hide a pane; make sure a key parked there can't
+        // collide with a pane that is now visible
+        dedupePanes();
         saveWindowState();
     }
 </script>
@@ -165,13 +194,18 @@
                                         <option value="" disabled selected>
                                             -- Choose Session --
                                         </option>
-                                        {#each sessions as s (s.sessionKey)}
+                                        {#each availableSessions as s (s.sessionKey)}
                                             <option value={s.sessionKey}>
                                                 {s.label || s.targetIp} ({s.username}@{s.targetIp})
                                             </option>
                                         {/each}
                                     </select>
                                 </div>
+                                {#if availableSessions.length === 0}
+                                    <p class="no-sessions-hint">
+                                        All active sessions are already in use
+                                    </p>
+                                {/if}
                             </div>
                         </div>
                     {/if}
@@ -284,6 +318,12 @@
 
     .select-wrapper {
         position: relative;
+    }
+
+    .no-sessions-hint {
+        margin: 0;
+        font-size: 12px;
+        color: var(--sf-text-hint, #4a6a8a);
     }
 
     select {

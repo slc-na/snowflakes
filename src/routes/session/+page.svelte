@@ -46,16 +46,6 @@
     let sessionGeneration = 0;
 
 
-    // xterm parses writes asynchronously (chunked across several event-loop ticks).
-    // `clear()`/`reset()` do NOT cancel data that is already queued, so the tail of
-    // the previous tab's output/scrollback-restore would otherwise keep rendering
-    // after the terminal has been handed to the next tab. Writing an empty chunk
-    // with a callback queues a barrier that fires once everything pending is parsed.
-    function drainTerminalWrites(target: Terminal): Promise<void> {
-        return new Promise((resolve) => target.write("", () => resolve()));
-    }
-
-
     function handleResize() {
         fitAddon.fit()
     };
@@ -353,34 +343,27 @@
             // its async continuation can't write into the terminal after switch
             sessionGeneration += 1;
             const generation = sessionGeneration;
-            const outgoingKey = currentSshKey;
 
-            // stop the outgoing session from queueing new output before we drain
+            if(currentSshKey && serializeAddon){
+                // apabila skrg uda buka tab, lalu mau pindah tab, kita savve dlu state skrg
+                saveTerminalState(currentSshKey, serializeAddon.serialize())
+            }
+
+            // cleanup listener lama
             disposeActiveSession();
 
-            // Only after xterm has parsed every byte already queued is it safe to
-            // reuse the terminal: without this, the tail of the previous tab's
-            // output/restore renders into the newly selected tab.
-            void drainTerminalWrites(term).then(() => {
-                if (generation !== sessionGeneration) return;
+            if (targetKey && targetKey !== "unknown") {
+                console.debug("SSH Key changed or initialized:", targetKey);
 
-                if (outgoingKey && outgoingKey !== "unknown" && serializeAddon) {
-                    // apabila skrg uda buka tab, lalu mau pindah tab, kita savve dlu state skrg
-                    saveTerminalState(outgoingKey, serializeAddon.serialize())
-                }
-
-                if (targetKey && targetKey !== "unknown") {
-                    console.debug("SSH Key changed or initialized:", targetKey);
-
-                    // reset (not clear) so buffered lines, scrollback and terminal
-                    // modes set by the previous session can't leak into this one
-                    term.reset();
-                    currentSshKey = targetKey;
-                    setupSsh(targetKey, generation);
-                } else {
-                    currentSshKey = "unknown";
-                }
-            });
+                // RIS is a queued full reset (buffer, scrollback, modes), so it
+                // lands after whatever xterm already queued. clear()/reset() run
+                // too early and let the old tab's pending output render here.
+                term.write("\x1bc");
+                currentSshKey = targetKey;
+                setupSsh(targetKey, generation);
+            } else {
+                currentSshKey = "unknown";
+            }
         }
     });
 

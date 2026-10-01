@@ -58,13 +58,6 @@
         }
     }
 
-    // xterm parses writes asynchronously (chunked across event-loop ticks) and
-    // reset() does not cancel already-queued data. Writing an empty chunk with a
-    // callback queues a barrier that fires once everything pending is parsed.
-    function drainPaneWrites(target: Terminal): Promise<void> {
-        return new Promise((resolve) => target.write("", () => resolve()));
-    }
-
     onMount(() => {
         term = new Terminal({
             theme: {
@@ -233,19 +226,20 @@
                 return false;
             }
 
-            let increment = 0;
-
+            // Only the font-zoom shortcuts are consumed here. Every other key -
+            // including Ctrl+C, Ctrl+D, Ctrl+L, ... - must fall through to xterm:
+            // returning false makes xterm ignore the event, so the shell never sees it.
             if (e.type === 'keydown' && e.ctrlKey && term && fitAddon) {
-                if (e.key === "=" || e.key === "+") {
-                    e.preventDefault();
-                    increment = 1;
-                } else if (e.key === "-") {
-                    e.preventDefault();
-                    increment = -1;
-                }
+                const increment =
+                    e.key === "=" || e.key === "+" ? 1
+                    : e.key === "-" ? -1
+                    : 0;
 
-                incrementTerminalFont(term, fitAddon, increment)
-                return false
+                if (increment !== 0) {
+                    e.preventDefault();
+                    incrementTerminalFont(term, fitAddon, increment);
+                    return false;
+                }
             }
             return true;
         };
@@ -258,25 +252,17 @@
                 // invalidate any in-flight setup for the previous session first
                 setupGeneration += 1;
                 const generation = setupGeneration;
-                const activeTerm = term;
                 disposePaneSession();
 
-                if (!activeTerm) return;
-
-                // xterm parses writes asynchronously and reset() does not cancel
-                // already-queued data, so drain before handing the terminal to
-                // another session or its output would bleed into the new one
-                void drainPaneWrites(activeTerm).then(() => {
-                    if (generation !== setupGeneration) return;
-
-                    if (targetKey && targetKey !== "unknown") {
-                        activeTerm.reset();
-                        currentSshKey = targetKey;
-                        setupSsh(targetKey, generation);
-                    } else {
-                        currentSshKey = "unknown";
-                    }
-                });
+                if (targetKey && targetKey !== "unknown") {
+                    // queued full reset (RIS): runs after the old session's pending
+                    // output, unlike reset() which would run too early
+                    term?.write("\x1bc");
+                    currentSshKey = targetKey;
+                    setupSsh(targetKey, generation);
+                } else {
+                    currentSshKey = "unknown";
+                }
             }
         });
 
