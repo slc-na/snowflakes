@@ -44,12 +44,12 @@
             bastionIp = settings.bastionIp;
             sshTemplate = settings.sshTemplate;
             fontSize = settings.fontSize;
-            
-            
+
+
             const account = await loadDefaultAccount();
             accountUsername = account.username;
             accountPassword = account.password;
-         
+
             // getting username based on oauth
             if(!accountUsername){
                 const oauthUser: any = await invoke("get_user_info");
@@ -64,7 +64,7 @@
                 await saveDefaultAccount(account);
             }
 
-            // get bastion IP from backend if not set 
+            // get bastion IP from backend if not set
             if(!bastionIp){
                 try {
                     const bastionIpResult: any = await invoke("get_bastion_ip");
@@ -138,7 +138,7 @@
                         <input
                             id="bastion-ip"
                             type="text"
-                            placeholder="10.22.77.251"
+                            placeholder="10.22.77.248"
                             bind:value={bastionIp}
                         />
                     </div>
@@ -229,7 +229,7 @@
         </div>
     </div>
 
-    
+
 </div>
 
 <style>

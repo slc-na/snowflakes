@@ -1,1 +1,1 @@
-export const bastion = "10.22.77.251";
+export const bastion = "10.22.77.248";
