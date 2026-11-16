@@ -1,0 +1,240 @@
+name: 'publish'
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  # Runs once, so the two build jobs never race to create the same draft release.
+  create-release:
+    runs-on: host-exec
+    outputs:
+      release_id: ${{ steps.rel.outputs.release_id }}
+    steps:
+      - uses: https://github.com/actions/checkout@v4
+
+      - name: find or create draft release
+        id: rel
+        shell: bash
+        env:
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          SERVER_URL: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          node <<'EOF'
+          const fs = require("fs");
+
+          async function run() {
+            // --- read the app version ---
+            let version = "";
+            const tauriConfPath = "src-tauri/tauri.conf.json";
+            if (fs.existsSync(tauriConfPath)) {
+              const conf = JSON.parse(fs.readFileSync(tauriConfPath, "utf8"));
+              version = conf.version || (conf.package && conf.package.version) || "";
+            }
+            if (!version && fs.existsSync("src-tauri/Cargo.toml")) {
+              const m = fs.readFileSync("src-tauri/Cargo.toml", "utf8").match(/^version\s*=\s*"([^"]+)"/m);
+              if (m) version = m[1];
+            }
+            if (!version && fs.existsSync("package.json")) {
+              version = JSON.parse(fs.readFileSync("package.json", "utf8")).version;
+            }
+            if (!version) throw new Error("App version not found");
+
+            const tagName = `app-v${version}`;
+            const apiBase = `${process.env.SERVER_URL}/api/v1/repos/${process.env.REPO}`;
+            const headers = {
+              "Authorization": `token ${process.env.FORGEJO_TOKEN}`,
+              "Content-Type": "application/json"
+            };
+
+            // --- look for an existing release with this tag (paginated) ---
+            let release = null;
+            for (let page = 1; page <= 20 && !release; page++) {
+              const res = await fetch(`${apiBase}/releases?per_page=50&page=${page}`, { headers });
+              if (!res.ok) throw new Error(`Failed to list releases: ${res.status} ${await res.text()}`);
+              const batch = await res.json();
+              release = batch.find(r => r.tag_name === tagName) || null;
+              if (batch.length < 50) break;
+            }
+
+            // --- create it if missing ---
+            if (!release) {
+              const res = await fetch(`${apiBase}/releases`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  tag_name: tagName,
+                  target_commitish: process.env.COMMIT_SHA,
+                  name: `App v${version}`,
+                  body: "See the assets to download this version and install.",
+                  draft: true,
+                  prerelease: false
+                })
+              });
+              if (!res.ok) throw new Error(`Failed to create release: ${res.status} ${await res.text()}`);
+              release = await res.json();
+              console.log(`Created draft release ${tagName} (id ${release.id})`);
+            } else {
+              console.log(`Using existing release ${tagName} (id ${release.id})`);
+            }
+
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_id=${release.id}\n`);
+          }
+
+          run().catch(err => { console.error(err); process.exit(1); });
+          EOF
+
+  publish-tauri:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      # host-exec runs on one machine: build one target at a time so the jobs
+      # don't fight over apt locks, ~/.cargo and the Rust target directory.
+      max-parallel: 1
+      matrix:
+        include:
+          - target_os: 'linux'
+            args: ''
+            bundle_dir: 'src-tauri/target/release/bundle'
+          - target_os: 'windows'
+            args: '--runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis'
+            bundle_dir: 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle'
+
+    runs-on: host-exec
+
+    steps:
+      - uses: https://github.com/actions/checkout@v4
+
+      - name: setup node
+        uses: https://github.com/actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: install Rust stable
+        uses: https://github.com/dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target_os == 'windows' && 'x86_64-pc-windows-msvc' || '' }}
+
+      # On a host runner, packages persist between runs, so only install what is missing.
+      # Needs root or passwordless sudo ("sudo -n" fails fast instead of hanging on a prompt).
+      - name: install Linux build dependencies
+        if: matrix.target_os == 'linux'
+        shell: bash
+        run: |
+          SUDO="sudo -n"
+          if [ "$(id -u)" -eq 0 ]; then SUDO=""; fi
+          MISSING=""
+          for p in build-essential curl wget file libssl-dev libxdo-dev \
+                   libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf; do
+            dpkg -s "$p" >/dev/null 2>&1 || MISSING="$MISSING $p"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "Installing:$MISSING"
+            $SUDO apt-get update
+            $SUDO apt-get install -y $MISSING
+          else
+            echo "All Linux build dependencies already installed"
+          fi
+
+      - name: install Windows cross-compile tools
+        if: matrix.target_os == 'windows'
+        shell: bash
+        run: |
+          SUDO="sudo -n"
+          if [ "$(id -u)" -eq 0 ]; then SUDO=""; fi
+          MISSING=""
+          for p in nsis lld llvm clang; do
+            dpkg -s "$p" >/dev/null 2>&1 || MISSING="$MISSING $p"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "Installing:$MISSING"
+            $SUDO apt-get update
+            $SUDO apt-get install -y $MISSING
+          fi
+          if ! command -v cargo-xwin >/dev/null 2>&1; then
+            cargo install --locked cargo-xwin
+          fi
+
+      - name: install frontend dependencies
+        shell: bash
+        run: |
+          # swap for pnpm / bun if you use another package manager
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      # The host keeps old build output between runs, so wipe it to avoid
+      # uploading stale installers from a previous version.
+      - name: clean previous bundles
+        shell: bash
+        run: |
+          rm -rf "${{ matrix.bundle_dir }}" dist/release
+
+      - name: build tauri app
+        shell: bash
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: npm run tauri build -- ${{ matrix.args }}
+
+      - name: stage release artifacts
+        shell: bash
+        run: |
+          mkdir -p dist/release
+          find "${{ matrix.bundle_dir }}" -type f \
+            \( -name "*.deb" -o -name "*.AppImage" -o -name "*.AppImage.tar.gz" -o -name "*.rpm" \
+               -o -name "*.exe" -o -name "*.nsis.zip" \) \
+            -exec cp {} dist/release/ \;
+          ls -la dist/release
+
+      - name: upload assets to Forgejo release
+        shell: bash
+        env:
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          SERVER_URL: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        run: |
+          node <<'EOF'
+          const fs = require("fs");
+          const path = require("path");
+
+          async function run() {
+            const apiBase = `${process.env.SERVER_URL}/api/v1/repos/${process.env.REPO}`;
+            const releaseId = process.env.RELEASE_ID;
+            const auth = { "Authorization": `token ${process.env.FORGEJO_TOKEN}` };
+
+            const dir = "dist/release";
+            const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+            if (files.length === 0) throw new Error("No artifacts found to upload");
+
+            // existing assets, so re-runs replace files instead of failing on duplicate names
+            const listRes = await fetch(`${apiBase}/releases/${releaseId}/assets`, { headers: auth });
+            if (!listRes.ok) throw new Error(`Failed to list assets: ${listRes.status} ${await listRes.text()}`);
+            const existing = await listRes.json();
+
+            for (const file of files) {
+              const old = existing.find(a => a.name === file);
+              if (old) {
+                const del = await fetch(`${apiBase}/releases/${releaseId}/assets/${old.id}`, {
+                  method: "DELETE",
+                  headers: auth
+                });
+                if (!del.ok) throw new Error(`Failed to delete old ${file}: ${del.status} ${await del.text()}`);
+                console.log(`Replacing existing asset: ${file}`);
+              }
+
+              const form = new FormData();
+              form.append("attachment", new Blob([fs.readFileSync(path.join(dir, file))]), file);
+
+              const up = await fetch(
+                `${apiBase}/releases/${releaseId}/assets?name=${encodeURIComponent(file)}`,
+                { method: "POST", headers: auth, body: form }
+              );
+              if (!up.ok) throw new Error(`Failed to upload ${file}: ${up.status} ${await up.text()}`);
+              console.log(`Uploaded: ${file}`);
+            }
+          }
+
+          run().catch(err => { console.error(err); process.exit(1); });
+          EOF
