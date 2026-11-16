@@ -22,6 +22,7 @@ jobs:
           SERVER_URL: ${{ github.server_url }}
           REPO: ${{ github.repository }}
           COMMIT_SHA: ${{ github.sha }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: |
           node <<'EOF'
           const fs = require("fs");
@@ -175,6 +176,7 @@ jobs:
         shell: bash
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npm run tauri build -- ${{ matrix.args }}
 
       - name: stage release artifacts
